@@ -53,7 +53,11 @@ final class Settings {
             i("sdr.sat", 100, 0, 300), i("sdr.temp", 0, -100, 100),
             i("hdr.bright", 100, 0, 300), i("hdr.black", 0, 0, 50), i("hdr.gamma", 100, 30, 300),
             i("hdr.sat", 100, 0, 300), i("hdr.temp", 0, -100, 100),
-            i("hdr.fix", 0, 0, 100),            // HDR correction: read the picture as PQ and bring it to SDR levels, %
+            // HDR light (see Hdr): how the copy is read, the white level, the highlights' share of the LEDs, the top
+            new Def("hdr.read", CHOICE, "auto", 0, 0, "auto", "android", "pq", "sdr"),
+            i("hdr.white", 203, 20, 1000),      // nits that count as white (BT.2408 HDR reference white: 203)
+            i("hdr.headroom", 25, 0, 90),       // % of the LED range kept for light above white
+            i("hdr.peak", 1000, 100, 4000),     // nits of the brightest highlight (about the TV's peak)
     };
 
     private final Map<String, String> values = new LinkedHashMap<>();

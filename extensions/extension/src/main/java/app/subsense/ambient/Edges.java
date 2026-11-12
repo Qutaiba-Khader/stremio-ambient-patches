@@ -144,7 +144,7 @@ final class Edges {
 
     /** One set of colour adjustments (SDR or HDR) read from the settings. */
     static final class Colour {
-        float bright = 1, black = 0, gamma = 1, sat = 1, fix = 0;
+        float bright = 1, black = 0, gamma = 1, sat = 1;
         float mr = 1, mg = 1, mb = 1;
 
         static Colour of(Settings s, String set) {
@@ -153,7 +153,6 @@ final class Edges {
             c.black = s.i(set + ".black") / 100f;
             c.gamma = s.i(set + ".gamma") / 100f;
             c.sat = s.i(set + ".sat") / 100f;
-            c.fix = set.equals("hdr") ? s.i("hdr.fix") / 100f : 0;
             float t = s.i(set + ".temp") / 100f;
             // warmer (t < 0) takes blue and some green away, cooler (t > 0) takes red and some green away
             if (t < 0) { c.mg = 1 + 0.12f * t; c.mb = 1 + 0.35f * t; }
@@ -162,17 +161,12 @@ final class Edges {
         }
 
         boolean neutral() {
-            return bright == 1 && black == 0 && gamma == 1 && sat == 1 && fix == 0 && mr == 1 && mg == 1 && mb == 1;
+            return bright == 1 && black == 0 && gamma == 1 && sat == 1 && mr == 1 && mg == 1 && mb == 1;
         }
 
         int apply(int rgb) {
             if (neutral()) return rgb & 0xffffff;
             float r = ((rgb >> 16) & 255) / 255f, g = ((rgb >> 8) & 255) / 255f, b = (rgb & 255) / 255f;
-            if (fix > 0) {
-                r += (pqToSdr(r) - r) * fix;
-                g += (pqToSdr(g) - g) * fix;
-                b += (pqToSdr(b) - b) * fix;
-            }
             if (black > 0) {
                 r = Math.max(0, (r - black) / (1 - black));
                 g = Math.max(0, (g - black) / (1 - black));
@@ -197,17 +191,6 @@ final class Edges {
     }
 
     private static int to8(float v) { return Math.max(0, Math.min(255, Math.round(v * 255))); }
-
-    /**
-     * A value read as a PQ (SMPTE ST 2084) code, brought to SDR: its light in nits over HDR reference white (203 nits),
-     * then the SDR curve (gamma 2.2). Used when the picture handed to the app carries the HDR signal itself.
-     */
-    static float pqToSdr(float v) {
-        final double m1 = 2610 / 16384.0, m2 = 2523 / 4096.0 * 128, c1 = 3424 / 4096.0, c2 = 2413 / 4096.0 * 32, c3 = 2392 / 4096.0 * 32;
-        double e = Math.pow(Math.max(0, v), 1 / m2);
-        double nits = 10000 * Math.pow(Math.max(e - c1, 0) / (c2 - c3 * e), 1 / m1);
-        return (float) Math.min(1, Math.pow(nits / 203, 1 / 2.2));
-    }
 
     // ---- the image for HyperHDR ----
 

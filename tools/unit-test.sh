@@ -6,6 +6,6 @@ python3 tools/gen-page.py --check || { echo "Page.java is not what page.html giv
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 src=extensions/extension/src/main/java/app/subsense/ambient
-javac -d "$out" -Xlint:all -Werror $src/Settings.java $src/Json.java $src/Edges.java $src/Fb.java $src/Net.java $src/Formats.java \
+javac -d "$out" -Xlint:all -Werror $src/Settings.java $src/Json.java $src/Edges.java $src/Fb.java $src/Net.java $src/Formats.java $src/Hdr.java \
     test/java/app/subsense/ambient/AmbientTest.java
 java -cp "$out" app.subsense.ambient.AmbientTest

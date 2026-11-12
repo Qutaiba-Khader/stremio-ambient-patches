@@ -36,6 +36,7 @@ public final class AmbientTest {
         flatbuffers();
         net();
         formats();
+        hdr();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
     }
@@ -82,13 +83,15 @@ public final class AmbientTest {
         stored.put("top", "20");
         stored.put("left", "999");
         stored.put("host", "bad host");
-        stored.put("hdr.fix", "40");
+        stored.put("hdr.white", "150");
+        stored.put("hdr.fix", "40"); // a setting of an older version: ignored
         Settings l = new Settings();
         l.load(stored);
         eq(20, l.i("top"), "stored top loaded");
         eq(4, l.i("left"), "bad stored left keeps the default");
         eq("", l.get("host"), "bad stored address keeps none");
-        eq(40, l.i("hdr.fix"), "stored hdr.fix");
+        eq(150, l.i("hdr.white"), "stored hdr.white");
+        check(l.get("hdr.fix") == null, "an old setting is not kept");
         // reset keeps the address and the port
         l.set("host", "10.0.0.2");
         l.set("port", "9000");
@@ -276,21 +279,6 @@ public final class AmbientTest {
         Settings both = set("hdr.bright", "50");
         check(Edges.Colour.of(both, "sdr").neutral(), "the SDR set ignores HDR values");
         eq(0x404040, Edges.Colour.of(both, "hdr").apply(0x808080), "the HDR set");
-        check(Edges.Colour.of(set("hdr.fix", "100"), "sdr").neutral(), "HDR correction only in the HDR set");
-        // PQ to SDR
-        float ref = Edges.pqToSdr(0.5807f); // PQ code of 203 nits
-        check(Math.abs(ref - 1f) < 0.01f, "PQ reference white is SDR white: " + ref);
-        check(Edges.pqToSdr(0f) == 0f, "PQ black");
-        float last = -1;
-        boolean up = true;
-        for (int i = 0; i <= 100; i++) {
-            float v = Edges.pqToSdr(i / 100f);
-            up &= v >= last && v <= 1;
-            last = v;
-        }
-        check(up, "PQ to SDR rises and stays within 0..1");
-        int fixed = Edges.Colour.of(set("hdr.fix", "100"), "hdr").apply(0x606060);
-        check((fixed & 255) > 0x60, "HDR correction lifts a dim PQ grey: " + Integer.toHexString(fixed));
     }
 
     // ---- the image ----
@@ -325,6 +313,8 @@ public final class AmbientTest {
         eq(2, Edges.image(new int[1 + 5 + 1 + 2], p).w, "one top and one bottom point: width 2");
         eq(12, Edges.lcm(4, 6), "lcm");
     }
+
+    static int grey(int v) { return v << 16 | v << 8 | v; }
 
     static int px(Edges.Image im, int x, int y) {
         int i = 3 * (y * im.w + x);
@@ -477,4 +467,92 @@ public final class AmbientTest {
         eq("1280x720", Formats.part(hdr, "res="), "res= is not decRes=");
         eq("video/avc, colour not given", Formats.summary("id=1, mimeType=video/avc"), "summary without colour");
     }
+
+    // ---- HDR light ----
+
+    static void hdr() {
+        // PQ round trip and reference points
+        for (double n : new double[]{0.01, 1, 10, 100, 203, 1000, 4000, 10000}) {
+            check(Math.abs(Hdr.pqEotf(Hdr.pqOetf(n)) - n) < n * 1e-6 + 1e-6, "PQ round trip " + n);
+        }
+        check(Math.abs(Hdr.pqOetf(203) - 0.5807) < 0.001, "203 nits is PQ 0.58");
+        check(Math.abs(Hdr.pqOetf(100) - 0.5081) < 0.001, "100 nits is PQ 0.51");
+        // Android's tone curve: kept below 650, continuous, rising, 4000 -> 1000, and invertible
+        eq(400.0, Hdr.toneMap(400), "below the knee: kept");
+        check(Math.abs(Hdr.toneMap(650) - 650) < 1e-6, "continuous at the knee");
+        check(Math.abs(Hdr.toneMap(1438.235) - 900) < 0.5, "control point 1438 -> 900");
+        check(Math.abs(Hdr.toneMap(4000) - 1000) < 1e-6, "4000 -> 1000");
+        eq(1000.0, Hdr.toneMap(9000), "over 4000: the display's top");
+        double last = -1;
+        boolean up = true, inv = true;
+        for (double n = 0; n <= 4000; n += 7) {
+            double t = Hdr.toneMap(n);
+            up &= t >= last - 1e-9;
+            last = t;
+            inv &= Math.abs(Hdr.untoneMap(t) - n) < Math.max(0.01, n * 1e-6);
+        }
+        check(up, "tone curve rises");
+        check(inv, "untoneMap undoes toneMap from 0 to 4000 nits");
+        // the model of Android 14's copy (sRGB-encoded, 1000 nits = full): 203 nits -> 49 %, 100 -> 35 %
+        eq(124L, Math.round(Hdr.androidReadback(203) * 255), "Android's copy of 203 nits");
+        eq(89L, Math.round(Hdr.androidReadback(100) * 255), "Android's copy of 100 nits");
+        check(Math.abs(Hdr.srgbToLinear(Hdr.linearToSrgb(0.3)) - 0.3) < 1e-9 && Hdr.linearToSrgb(0.001) < 0.02, "sRGB curve round trip");
+        // decoding Android's 8-bit copy gets the light back (within the 8-bit step)
+        double worst = 0;
+        for (double n : new double[]{5, 20, 50, 100, 203, 400, 600, 800, 1000, 1500, 2000, 3000}) {
+            int v = (int) Math.round(Hdr.androidReadback(n) * 255);
+            double got = Hdr.androidToNits(v << 16 | v << 8 | v, false)[0];
+            // one 8-bit step around v (grey), in nits: the precision the copy allows
+            double lo = Hdr.androidToNits(grey(v - 1), false)[0], hi = Hdr.androidToNits(grey(Math.min(255, v + 1)), false)[0];
+            check(got >= lo && got <= hi && n >= lo && n <= hi, "Android copy of " + n + " nits decodes to " + Math.round(got));
+            worst = Math.max(worst, Math.abs(got - n) / n);
+        }
+        check(worst < 0.2, "decoding error within the copy's 8-bit step (worst " + Math.round(worst * 100) + " %)");
+        // a colour: Android scales it by its brightest BT.2020 channel; built here the same way, then decoded
+        double cr = 1200, cg = 1000, m20 = 0.6274 * cr + 0.3293 * cg, gain = Hdr.toneMap(m20) / m20;
+        int er = (int) Math.round(Hdr.linearToSrgb(Math.min(1, cr * gain / 1000)) * 255), eg = (int) Math.round(Hdr.linearToSrgb(cg * gain / 1000) * 255);
+        double[] c = Hdr.androidToNits(er << 16 | eg << 8, false);
+        check(Math.abs(c[0] - 1200) < 100 && Math.abs(c[1] - 1000) < 90, "a bright warm white (1200/1000 nits, under Android's clip) decodes back: " + Math.round(c[0]) + "/" + Math.round(c[1]));
+        check(Math.abs(c[1] / c[0] - 1000.0 / 1200) < 0.03, "and keeps its hue");
+        double[] hlg = Hdr.androidToNits(255 << 16, true);
+        eq(1000L, Math.round(hlg[0]), "HLG: full red is 1000 nits, nothing to uncompress");
+        // the PQ signal itself (software decoding)
+        int code = (int) Math.round(Hdr.pqOetf(203) * 255);
+        check(Math.abs(Hdr.pqToNits(code << 16)[0] - 203) < 10, "raw PQ 203 nits");
+        check(Math.abs(Hdr.hlgToNits(255 << 16)[0] - 1000) < 1, "raw HLG 1.0 = 1000 nits");
+        check(Hdr.hlgToNits(0)[0] == 0, "raw HLG 0");
+        // to the LEDs
+        Hdr.Curve k = new Hdr.Curve(203, 1000, 0.25);
+        check(Math.abs(k.led(203) - 0.75) < 1e-9, "white with 25 % headroom: 75 % of the LEDs");
+        check(k.led(1000) == 1 && k.led(4000) == 1, "brightest highlight and over: full");
+        check(k.led(0) == 0, "black");
+        check(Math.abs(k.led(101.5) - 0.375) < 1e-9, "half of white: half of 75 %");
+        last = -1;
+        up = true;
+        for (double n = 0; n <= 1500; n += 3) {
+            double l = k.led(n);
+            up &= l >= last && l <= 1;
+            last = l;
+        }
+        check(up, "LED curve rises and stays within 0..1");
+        check(k.led(400) - k.led(203) > k.led(1000) - k.led(800), "highlights ease out");
+        Hdr.Curve none = new Hdr.Curve(203, 1000, 0);
+        check(none.led(203) == 1 && none.led(300) == 1, "no headroom: white is full, above it clips");
+        eq(0xffffff & (0xe0 << 16 | 0xe0 << 8 | 0xe0), k.encode(new double[]{203, 203, 203}), "white encodes to 0.75^(1/2.2) = 224");
+        // a red highlight stays red (the curve on its brightest channel, the colour scaled with it)
+        int red = k.encode(new double[]{1000, 100, 100});
+        check(((red >> 16) & 255) == 255 && Math.abs(((red >> 8) & 255) - Math.round(Math.pow(0.1, 1 / 2.2) * 255)) <= 1, "red highlight keeps its hue: " + Integer.toHexString(red));
+        // the old dim copy is lit properly now: Android's copy of 100 nits (89) becomes about 162 with the defaults
+        Settings def = new Settings();
+        int lit = Hdr.toLed(89 << 16 | 89 << 8 | 89, "android", false, Hdr.Curve.of(def));
+        check(((lit >> 16) & 255) >= 158 && ((lit >> 16) & 255) <= 166, "100 nits on the LEDs: " + ((lit >> 16) & 255) + " (was 89)");
+        eq(0x123456, Hdr.toLed(0x123456, "sdr", false, k), "read as SDR: unchanged");
+        for (String key : new String[]{"hdr.read", "hdr.white", "hdr.headroom", "hdr.peak"}) check(def.get(key) != null, "setting " + key);
+        eq("auto", def.get("hdr.read"), "HDR reading automatic by default");
+        check(new Settings().set("hdr.read", "raw") != null, "unknown reading refused");
+        Settings r = set("hdr.white", "100", "hdr.peak", "2000");
+        r.reset("hdr.");
+        eq(203, r.i("hdr.white"), "reset HDR set puts the white back");
+    }
 }
+

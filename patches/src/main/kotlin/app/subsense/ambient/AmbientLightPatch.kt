@@ -59,8 +59,50 @@ val ambientLightPatch = bytecodePatch(
         hookApplication()
         hookTunneling()
         hookCodecConfigure()
+        hookCodecRelease()
         bridgeFormatType()
     }
+}
+
+/** Before every MediaCodec.release(): the video's codec going away (Ambient tells hardware from FFmpeg decoding). */
+private fun BytecodePatchContext.hookCodecRelease() {
+    val n = hookCalls("MediaCodec.release", { it.name == "release" && it.parameterTypes.isEmpty() && it.returnType == "V" }) { regs, range ->
+        (if (range) "invoke-static/range {v${regs[0]} .. v${regs[0]}}" else "invoke-static {v${regs[0]}}") +
+            ", $EXTENSION->onCodecRelease(Ljava/lang/Object;)V"
+    }
+    if (n == 0) throw PatchException("MediaCodec.release: no call found")
+}
+
+/**
+ * Puts `code(registers, isRange)` before every call to a MediaCodec method that `match` accepts; returns how many. Each
+ * method is searched again as it is when patched, so hooks that land in the same method never use stale positions.
+ * `registers`: the call's registers (35c), or its first register (3rc).
+ */
+private fun BytecodePatchContext.hookCalls(what: String, match: (MethodReference) -> Boolean, code: (List<Int>, Boolean) -> String): Int {
+    fun calls(insns: List<com.android.tools.smali.dexlib2.iface.instruction.Instruction>) = insns.withIndex().filter { (_, insn) ->
+        val r = (insn as? ReferenceInstruction)?.reference as? MethodReference
+        r != null && r.definingClass == MEDIA_CODEC && match(r)
+    }
+    val methods = mutableListOf<Pair<String, String>>()
+    classDefForEach { c ->
+        for ((m, impl) in refs(c)) if (calls(impl.instructions.toList()).isNotEmpty()) {
+            methods += c.type to m.name + m.parameterTypes.joinToString("", "(", ")") + m.returnType
+        }
+    }
+    var count = 0
+    for ((type, key) in methods.distinct()) {
+        val method = mutableClassDefBy(type).methods.first { it.name + it.parameterTypes.joinToString("", "(", ")") + it.returnType == key }
+        for ((i, insn) in calls(method.implementation!!.instructions.toList()).reversed()) {
+            val smali = when (insn) {
+                is FiveRegisterInstruction -> code(listOf(insn.registerC, insn.registerD, insn.registerE, insn.registerF, insn.registerG).take(insn.registerCount), false)
+                is RegisterRangeInstruction -> code(listOf(insn.startRegister), true)
+                else -> throw PatchException("$what: unexpected call form in $type")
+            }
+            method.addInstructions(i, smali)
+            count++
+        }
+    }
+    return count
 }
 
 /**
@@ -136,33 +178,16 @@ private fun BytecodePatchContext.hookTunneling() {
     method.addInstructions(site.index, "$call, $EXTENSION->tunneling(Z)Z\nmove-result $r")
 }
 
-/** Before every MediaCodec.configure(format, surface, crypto, flags): the format tells SDR or HDR. */
+/** Before every MediaCodec.configure(format, surface, crypto, flags): the codec and its format (SDR or HDR, hardware). */
 private fun BytecodePatchContext.hookCodecConfigure() {
-    data class Site(val type: String, val method: String, val index: Int, val format: Int, val surface: Int, val range: Boolean)
-    val sites = mutableListOf<Site>()
-    classDefForEach { c ->
-        for ((m, impl) in refs(c)) {
-            impl.instructions.forEachIndexed { i, insn ->
-                val call = (insn as? ReferenceInstruction)?.reference as? MethodReference ?: return@forEachIndexed
-                if (call.definingClass != MEDIA_CODEC || call.name != "configure" || call.returnType != "V" ||
-                    call.parameterTypes.joinToString("") != CONFIGURE_PARAMS
-                ) return@forEachIndexed
-                val key = m.name + m.parameterTypes.joinToString("", "(", ")") + m.returnType
-                when (insn) {
-                    is FiveRegisterInstruction -> sites += Site(c.type, key, i, insn.registerD, insn.registerE, false)
-                    is RegisterRangeInstruction -> sites += Site(c.type, key, i, insn.startRegister + 1, insn.startRegister + 2, true)
-                    else -> throw PatchException("MediaCodec.configure: unexpected call form in ${c.type}")
-                }
-            }
-        }
+    val n = hookCalls("MediaCodec.configure", {
+        it.name == "configure" && it.returnType == "V" && it.parameterTypes.joinToString("") == CONFIGURE_PARAMS
+    }) { regs, range ->
+        // the codec, the format and the surface: the call's first three registers
+        (if (range) "invoke-static/range {v${regs[0]} .. v${regs[0] + 2}}" else regs.take(3).joinToString(", ", "invoke-static {", "}") { "v$it" }) +
+            ", $EXTENSION->onCodecConfigure(Ljava/lang/Object;Landroid/media/MediaFormat;Landroid/view/Surface;)V"
     }
-    if (sites.isEmpty()) throw PatchException("MediaCodec.configure: no call found")
-    // later places first, so the earlier indexes stay valid
-    for (s in sites.sortedByDescending { it.index }) {
-        val method = mutableClassDefBy(s.type).methods.first { it.name + it.parameterTypes.joinToString("", "(", ")") + it.returnType == s.method }
-        val call = if (s.range) "invoke-static/range {v${s.format} .. v${s.surface}}" else "invoke-static {v${s.format}, v${s.surface}}"
-        method.addInstructions(s.index, "$call, $EXTENSION->onCodecConfigure(Landroid/media/MediaFormat;Landroid/view/Surface;)V")
-    }
+    if (n == 0) throw PatchException("MediaCodec.configure: no call found")
 }
 
 /** The launcher icon and the TV banner share one background: the normal one, lit from its edges like a TV with LEDs behind it. */

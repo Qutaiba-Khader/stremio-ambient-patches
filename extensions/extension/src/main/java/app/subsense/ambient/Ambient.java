@@ -63,7 +63,13 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
     // what the page shows (written by the threads below, read by the page)
     volatile String capture = "no video on screen";
     volatile String video = "none yet";
-    volatile boolean videoHdr, videoTunneled;
+    volatile boolean videoHdr, videoTunneled, videoHlg;
+    /** When a video MediaCodec was last configured and when the current video view was first seen (elapsedRealtime). */
+    volatile long codecAt = -1, surfaceAt;
+    volatile String hdrReading = "";
+    /** The video MediaCodec now set up (null when it was released) and its mime; the playing format's mime (FormatProbe). */
+    private volatile WeakReference<Object> videoCodec;
+    volatile String codecMime = "", probeMime;
     volatile long videoAt;
     volatile String activeSet = "sdr";
     volatile int[] rawColours, outColours, content;
@@ -131,15 +137,19 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
     }
 
     /** Before every MediaCodec.configure: a video codec with a surface is the video being played. */
-    public static void onCodecConfigure(MediaFormat format, Surface surface) {
+    public static void onCodecConfigure(Object codec, MediaFormat format, Surface surface) {
         try {
             Ambient a = instance;
             if (a == null || format == null || surface == null) return;
             String mime = format.containsKey(MediaFormat.KEY_MIME) ? format.getString(MediaFormat.KEY_MIME) : "";
             if (mime == null || !mime.startsWith("video/")) return;
+            a.videoCodec = new WeakReference<>(codec);
+            a.codecMime = mime;
             int transfer = intOf(format, "color-transfer");
             int profile = intOf(format, "profile");
             a.videoHdr = isHdr(mime, transfer, profile);
+            a.videoHlg = transfer == 7;
+            a.codecAt = SystemClock.elapsedRealtime();
             a.videoTunneled = intOf(format, "feature-tunneled-playback") == 1;
             a.videoAt = System.currentTimeMillis();
             a.video = mime + " " + intOf(format, "width") + "x" + intOf(format, "height") + ", "
@@ -149,6 +159,16 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
             Log.i(TAG, "video: " + a.video + (a.videoHdr ? " -> HDR" : " -> SDR"));
         } catch (Throwable t) {
             Log.w(TAG, "codec format not read", t);
+        }
+    }
+
+    /** Before every MediaCodec.release: the video's codec going away means the video is no longer hardware-decoded. */
+    public static void onCodecRelease(Object codec) {
+        try {
+            Ambient a = instance;
+            WeakReference<Object> v = a == null ? null : a.videoCodec;
+            if (v != null && v.get() == codec) a.videoCodec = null;
+        } catch (Throwable ignored) {
         }
     }
 
@@ -335,6 +355,8 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
         SurfaceView prev = lastSurface == null ? null : lastSurface.get();
         if (sv != prev) {
             lastSurface = new WeakReference<>(sv);
+            surfaceAt = now;
+            probeMime = null;
             lastProbe = null;
             probeAt = 0;
         }
@@ -346,6 +368,9 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
                 if (line == null || line.equals(lastProbe)) return;
                 lastProbe = line;
                 videoHdr = Formats.isHdr(line);
+                String colour = Formats.part(line, "color=");
+                videoHlg = colour != null && colour.contains("HLG");
+                probeMime = Formats.part(line, "mimeType=");
                 videoAt = System.currentTimeMillis();
                 video = Formats.summary(line) + (videoTunneled ? ", tunneled" : "");
                 Log.i(TAG, "video format: " + line + (videoHdr ? " -> HDR" : " -> SDR"));
@@ -375,21 +400,28 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
         bmp.getPixels(px, 0, W, 0, 0, W, H);
         Edges.Params p;
         Edges.Colour colour;
-        String set, host;
+        Hdr.Curve curve;
+        String set, host, read;
         int prio, rate;
         synchronized (settings) {
             p = Edges.Params.of(settings);
             String mode = settings.get("hdrMode");
             set = mode.equals("auto") ? (videoHdr ? "hdr" : "sdr") : mode;
             colour = Edges.Colour.of(settings, set);
+            curve = Hdr.Curve.of(settings);
+            read = settings.get("hdr.read");
             host = settings.get("host");
             prio = settings.i("priority");
             rate = settings.i("rate");
         }
         Edges.Result r = Edges.sample(px, W, H, p, lastContent);
         lastContent = r.content;
+        // An HDR video's copy is first brought back to its light, then to the LEDs (see Hdr). Automatic: a hardware decoder's
+        // buffer carries its dataspace and Android tone-maps the copy; Stremio's FFmpeg renderer writes the signal as is.
+        String how = !videoHdr ? "sdr" : read.equals("auto") ? (hardwareDecoded() ? "android" : "pq") : read;
+        hdrReading = how;
         int[] out = new int[r.colours.length];
-        for (int i = 0; i < out.length; i++) out[i] = colour.apply(r.colours[i]);
+        for (int i = 0; i < out.length; i++) out[i] = colour.apply(Hdr.toLed(r.colours[i], how, videoHlg, curve));
         activeSet = set;
         rawColours = r.colours;
         outColours = out;
@@ -410,6 +442,19 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
         int duration = Math.max(1000, 3 * 1000 / rate);
         sending = true;
         sender.offer(host, prio, Edges.image(out, p), duration);
+    }
+
+    /**
+     * Hardware-decoded: a video MediaCodec is set up and not released, and it decodes the playing format (same mime;
+     * Dolby Vision may be decoded by an HEVC, AVC or AV1 decoder). Stremio's FFmpeg renderer uses no MediaCodec.
+     */
+    private boolean hardwareDecoded() {
+        WeakReference<Object> v = videoCodec;
+        if (v == null || v.get() == null) return false;
+        String playing = probeMime;
+        if (playing == null || playing.equals(codecMime)) return true;
+        return playing.equals("video/dolby-vision")
+                && (codecMime.equals("video/hevc") || codecMime.equals("video/avc") || codecMime.equals("video/av01"));
     }
 
     private void stopSending(String why) {

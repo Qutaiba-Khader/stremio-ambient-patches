@@ -181,6 +181,8 @@ final class WebServer extends Thread {
         sb.append(",\"videoHdr\":").append(a.videoHdr);
         sb.append(",\"videoTunneled\":").append(a.videoTunneled);
         sb.append(",\"videoAt\":").append(a.videoAt);
+        sb.append(",\"hdrReading\":");
+        Json.str(sb, a.hdrReading);
         sb.append(",\"activeSet\":");
         Json.str(sb, a.activeSet);
         sb.append(",\"fps\":").append(Math.round(a.fps * 10) / 10.0);

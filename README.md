@@ -21,8 +21,14 @@ video leaves, the light is turned off or the address is removed). HyperHDR's LED
   picture. With *skip black bars* on, rows and columns where no pixel reaches the *bar level* are left out first.
 - **SDR / HDR**: read from the video (`MediaCodec.configure`'s format, or Media3's `Format` for videos that no
   MediaCodec decodes, such as Stremio's FFmpeg renderer): PQ, HLG and Dolby Vision count as HDR. Each has its own colour
-  set — brightness, black level, gamma, saturation, colour temperature — and the HDR set adds an *HDR correction* that
-  reads the picture as a PQ signal and brings it to SDR levels. Either set can also be forced.
+  set — brightness, black level, gamma, saturation, colour temperature. Either set can also be forced.
+- **HDR light**: Android 14's PixelCopy tone-maps an HDR video for a 1000-nit display and scales the copy so that 1000 nits
+  is full white (frameworks/base `libs/hwui/Readback.cpp`, `Tonemapper.cpp`; frameworks/native `libs/shaders`,
+  `libs/tonemap` ToneMapper13: below 650 nits kept, 650–4000 nits compressed onto 650–1000, divided by 1000, gamma 2.2).
+  Read as SDR that is far too dim (203-nit white at 48 %). The patch undoes exactly that to get the picture's light in
+  nits back — or, for a video decoded by Stremio's FFmpeg renderer (no dataspace on the window), decodes the PQ/HLG signal
+  itself — and maps the light to the LEDs with the HDR set's **white level** (nits shown as full white), **highlight
+  headroom** (LED range kept above white for highlights) and **brightest highlight** (nits, about the TV's peak).
 - **Tunneled playback**: Stremio turns it on with "Audio passthrough", and a tunneled picture never reaches the app. The
   patch gives it its own switch on the page, **off by default**; audio passthrough keeps working without it.
 - **Nothing is built in**: there is no HyperHDR address in the code and no discovery. Until one is typed on the page

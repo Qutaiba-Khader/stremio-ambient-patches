@@ -3,175 +3,398 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>Stremio Ambient</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%237b5bf5%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%237c5cff%27/%3E%3C/svg%3E">
 <style>
-:root{--bg:#0d0b1a;--card:#17142b;--line:#2b2650;--text:#ece9ff;--dim:#a39fc4;--acc:#7b5bf5;--ok:#3ccf8e;--warn:#f5b84b;--bad:#ff6b7d}
+:root{
+  --bg:#0c0b16;--panel:#15132a;--panel2:#1c1936;--line:#2a2650;--line2:#37326a;
+  --text:#ecebf7;--dim:#a29fc4;--faint:#6f6b96;
+  --accent:#7c5cff;--accent2:#9b83ff;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;
+  --r:14px;--font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-main{max-width:980px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:4px 0 2px}
-h2{font-size:16px;margin:0 0 10px;color:var(--text)}
-.sub{color:var(--dim);font-size:13px}
-.pills{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
-.pill{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;background:var(--card)}
-.pill b{font-weight:600}
-.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:760px){.grid{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-.wide{grid-column:1/-1}
-.row{display:grid;grid-template-columns:150px 1fr 56px;align-items:center;gap:10px;margin:7px 0}
-@media(max-width:420px){.row{grid-template-columns:110px 1fr 48px}}
-.row label{color:var(--dim);font-size:13px}
-.row output{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
-input[type=range]{width:100%;accent-color:var(--acc)}
-input[type=text],input[type=number],select{width:100%;background:#0f0d20;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit}
-.switch{display:flex;align-items:center;gap:10px;margin:8px 0;cursor:pointer}
-.switch input{width:18px;height:18px;accent-color:var(--acc)}
-.tabs{display:flex;gap:6px;margin-bottom:8px}
-.tab{background:#0f0d20;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:6px 14px;cursor:pointer;font:inherit}
-.tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
-.tab .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-left:6px;vertical-align:middle;visibility:hidden}
-.tab.live .dot{visibility:visible}
-button.small{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
-.hostrow{display:flex;gap:8px}
-.hostrow button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:0 14px;cursor:pointer;font:inherit}
-.note{color:var(--dim);font-size:12.5px;margin:4px 0 0}
-#err{display:none;background:#3a1622;border:1px solid var(--bad);color:#ffd5db;border-radius:10px;padding:8px 12px;margin:0 0 12px}
-#wrap{position:relative;width:100%;aspect-ratio:1120/680;margin:8px 0 6px}
-canvas{width:100%;height:100%;display:block}
-.prevbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.foot{color:var(--dim);font-size:12.5px;margin-top:14px}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--font);-webkit-text-size-adjust:100%}
+a{color:var(--accent2)}a:hover{color:#fff}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 40px}
+
+/* header */
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 0 10px}
+h1{margin:0;font-size:22px;letter-spacing:-.01em}
+.sub{margin:2px 0 0;color:var(--dim);font-size:13.5px;text-wrap:pretty}
+.power{display:flex;align-items:center;gap:10px;flex:none;padding:8px 10px 8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);cursor:pointer;min-height:44px}
+.power span{font-size:13px;font-weight:600;white-space:nowrap}
+.pills{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{flex:none;display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 11px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.pill b{color:var(--text);font-weight:600}
+.pill .ok{color:var(--ok)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+/* layout */
+.layout{display:block}
+.stage{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 10px;margin:0 -16px;padding-left:16px;padding-right:16px;border-bottom:1px solid var(--line)}
+.controls{padding-top:14px;display:flex;flex-direction:column;gap:14px}
+@media (min-width:900px){
+  .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start}
+  .stage{top:16px;margin:0;padding:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+  .controls{padding-top:0}
+  .pills{margin:0;padding-left:0;padding-right:0;flex-wrap:wrap}
+}
+
+/* preview */
+.stagehead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.stagehead h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-weight:600}
+.seg{display:inline-flex;padding:3px;border-radius:11px;background:var(--panel2);border:1px solid var(--line);gap:2px}
+.seg button{border:0;background:transparent;padding:7px 11px;border-radius:8px;font-size:12.5px;color:var(--dim);cursor:pointer;min-height:34px;white-space:nowrap}
+.seg button.on{background:var(--accent);color:#fff;font-weight:600}
+.viewer{position:relative;width:min(100%,calc(26vh*16/9 + 28px));margin:0 auto;padding:14px}
+@media (max-width:899px){.stagehead h2{display:none}.stagehead{margin-bottom:4px}.seg{display:grid;grid-template-columns:1fr 1fr;width:100%}.seg button{padding:8px 6px;white-space:normal;line-height:1.2}.caption{margin-top:0}}
+@media (min-width:900px){.viewer{width:100%;padding:34px}}
+.screen{position:relative;aspect-ratio:16/9;background:#050409;border-radius:4px;outline:1px solid #2b2848;overflow:visible}
+.pic{position:absolute;inset:0;border-radius:4px;overflow:hidden;opacity:.55}
+.bar{position:absolute;left:0;right:0;background:#000;display:none}
+.bars .bar{display:block}
+.area{position:absolute;border:1px solid rgba(255,255,255,.28);border-radius:2px;transition:background-color .35s linear;animation:pop .25s ease-out}
+.glow{position:absolute;border-radius:50%;filter:blur(16px);opacity:.8;pointer-events:none;transition:background-color .35s linear,opacity .5s;mix-blend-mode:screen}
+.lightsoff .glow{opacity:0}.lightsoff .area{filter:saturate(.3) brightness(.6)}
+body::before{content:"";position:fixed;inset:-20% -20% auto -20%;height:70vh;background:radial-gradient(ellipse at 50% 30%,var(--amb,#3a2a6a),transparent 65%);opacity:.22;pointer-events:none;transition:background .6s linear,opacity .6s;z-index:0}
+body.lightsoff::before{opacity:0}
+.wrap{position:relative;z-index:1}
+.stage{background:color-mix(in oklab,var(--bg) 88%,transparent)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+@media (min-width:900px){.stage{background:color-mix(in oklab,var(--panel) 90%,transparent)!important}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}50%{box-shadow:0 0 0 5px rgba(52,211,153,0)}}
+@keyframes fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.dot{animation:pulse 2s infinite}
+.seg button,.tab,.btn,.val{transition:background .2s,color .2s,border-color .2s,transform .1s}
+.btn:active,.tab:active,.seg button:active{transform:scale(.97)}
+details.card[open] .body{animation:fade .25s ease-out}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.empty{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;color:var(--faint);font-size:13px;padding:20px}
+.caption{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--faint);margin-top:2px}
+.caption b{color:var(--dim);font-weight:600}
+
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.cardhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+.cardhead h3{margin:0;font-size:16px}
+.hint{font-size:12.5px;color:var(--faint);margin:0;text-wrap:pretty}
+.group{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
+.grouplabel{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin:0 0 6px;font-weight:600}
+
+/* slider rows */
+.row{padding:6px 0}
+.rowtop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:2px}
+.rowtop label{font-size:14px;color:var(--text)}
+.rowtop small{color:var(--faint);font-size:12px;margin-left:4px}
+.val{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;color:var(--accent2);background:rgba(124,92,255,.12);padding:2px 8px;border-radius:6px;min-width:46px;text-align:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;background:transparent;margin:0;cursor:pointer;touch-action:pan-y}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(var(--accent),var(--accent)) 0/var(--p,50%) 100% no-repeat,var(--line2)}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--line2)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:-9px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 5px rgba(124,92,255,.35),0 2px 6px rgba(0,0,0,.5)}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 5px rgba(124,92,255,.35)}
+input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 6px var(--accent2)}
+input[type=range]:disabled{opacity:.4}
+
+/* switch */
+.sw{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:48px;cursor:pointer}
+.sw .t{font-size:14px}.sw .t small{display:block;color:var(--faint);font-size:12.5px;text-wrap:pretty}
+input[type=checkbox].tg{-webkit-appearance:none;appearance:none;flex:none;width:46px;height:28px;border-radius:999px;background:var(--line2);position:relative;cursor:pointer;transition:background .15s;margin:0}
+input[type=checkbox].tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s}
+input[type=checkbox].tg:checked{background:var(--accent)}
+input[type=checkbox].tg:checked::after{transform:translateX(18px)}
+
+/* fields & buttons */
+.field{display:flex;gap:8px}
+input[type=text],input[type=number],select{background:var(--bg);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;min-height:44px;width:100%;outline:none}
+input:focus-visible,select:focus-visible{border-color:var(--accent)}
+.btn{border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:10px 16px;min-height:44px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ghost{background:transparent;color:var(--dim);font-weight:500}
+.btn.danger{background:transparent;color:var(--bad);border-color:rgba(248,113,113,.35);font-weight:500;white-space:normal;text-align:left}
+.fl{display:block;font-size:14px;margin-bottom:6px}.fl small{color:var(--faint);font-size:12.5px;display:block}
+
+/* colour set tabs */
+.modebox{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.tab{position:relative;text-align:left;border:1.5px solid var(--line2);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:58px;display:flex;flex-direction:column;gap:2px}
+.tab .n{font-weight:700;font-size:15px}
+.tab .s{font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:5px}
+.tab.on{border-color:var(--accent);background:rgba(124,92,255,.14)}
+.tab.on .n{color:#fff}
+.tab.live .s{color:var(--ok)}
+.tab:not(.live) .dot{display:none}
+.editing{font-size:12.5px;color:var(--dim);margin:6px 0 4px;display:flex;align-items:center;gap:6px}
+.editing b{color:var(--text)}
+.note{font-size:12.5px;color:var(--faint);margin:2px 0 6px;text-wrap:pretty}
+
+/* collapsibles */
+details.card{padding:0}
+details.card>summary{list-style:none;cursor:pointer;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary h3{margin:0;font-size:16px}
+details.card>summary .meta{font-size:12.5px;color:var(--faint);margin-left:auto;text-align:right}
+details.card>summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg);margin:-4px 4px 0 4px;transition:transform .15s;flex:none}
+details.card[open]>summary::after{transform:rotate(-135deg);margin-top:4px}
+details.card .body{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px}
+.sectionlabel{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:600;margin:10px 2px -4px}
+footer{margin-top:22px;font-size:12px;color:var(--faint);line-height:1.6;word-break:break-word}
+/* Stremio Ambient additions to the design */
+html,body{overflow-x:clip}
+#err{display:none;background:#3a1622;border:1px solid var(--bad);color:#ffd5db;border-radius:10px;padding:8px 12px;margin:0 0 12px;font-size:13.5px}
+.vbar{top:0;bottom:0;left:auto;right:auto}
+.pill .bad{color:var(--bad)}.pill .warn{color:var(--warn)}
+.pill .dot.bad{background:var(--bad);box-shadow:0 0 8px var(--bad);animation:none}
+.pill .dot.warn{background:var(--warn);box-shadow:0 0 8px var(--warn);animation:none}
+.hdrlight{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.hdrlight select{margin-bottom:2px}
+#curve{width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;margin-top:4px}
+#curve text{fill:var(--faint);font-size:9px;font-family:var(--font)}
 </style>
 </head>
 <body>
-<main>
-<h1>Stremio Ambient</h1>
-<div class="sub">The colours along the picture's edges go to HyperHDR while Stremio plays. Every change applies at once and is saved on the TV.</div>
-<div class="pills" id="pills"></div>
-<div id="err"></div>
+<div class="wrap">
 
-<div class="grid">
-<section class="card wide">
-  <h2>Live preview</h2>
-  <div class="prevbar">
-    <button class="tab on" id="pvOut" type="button">After colour settings</button>
-    <button class="tab" id="pvRaw" type="button">As read from the picture</button>
+<header>
+  <div>
+    <h1>Stremio Ambient</h1>
+    <p class="sub">Edge colours of the playing video go to HyperHDR. Changes apply at once and are saved on the TV.</p>
   </div>
-  <div id="wrap"><canvas id="cv" width="1120" height="680"></canvas></div>
-  <div class="note" id="pvNote">Play something in Stremio to see the points.</div>
-</section>
+  <label class="power" title="Ambient light on">
+    <span>Ambient light</span>
+    <input type="checkbox" class="tg" data-k="enabled" aria-label="Ambient light on">
+  </label>
+</header>
 
-<section class="card">
-  <h2>HyperHDR</h2>
-  <label class="switch"><input type="checkbox" data-k="enabled"> Ambient light on</label>
-  <div class="note" style="margin:6px 0 4px">HyperHDR address (its flatbuffer server; port 19400 when left out)</div>
-  <div class="hostrow"><input type="text" id="host" placeholder="e.g. 192.168.0.50 or 192.168.0.50:19400" autocomplete="off" spellcheck="false"><button type="button" id="hostSave">Save</button></div>
-  <div class="row"><label>Priority</label><input type="range" data-k="priority"><output></output></div>
-  <div class="note" style="margin-top:-2px">In HyperHDR the lower number wins.</div>
-  <div class="row"><label>Updates per second</label><input type="range" data-k="rate"><output></output></div>
-</section>
+<div class="pills" id="pills"></div>
+<div id="err" role="alert"></div>
 
-<section class="card">
-  <h2>Points</h2>
-  <div class="row"><label>Top</label><input type="range" data-k="top"><output></output></div>
-  <div class="row"><label>Bottom</label><input type="range" data-k="bottom"><output></output></div>
-  <div class="row"><label>Left</label><input type="range" data-k="left"><output></output></div>
-  <div class="row"><label>Right</label><input type="range" data-k="right"><output></output></div>
-  <div class="row"><label>Distance from edge</label><input type="range" data-k="inset" data-u="%"><output></output></div>
-  <div class="row"><label>Area depth</label><input type="range" data-k="depth" data-u="%"><output></output></div>
-  <div class="row"><label>Area width</label><input type="range" data-k="spread" data-u="%"><output></output></div>
-  <label class="switch"><input type="checkbox" data-k="bars"> Skip black bars</label>
-  <div class="row"><label>Black-bar level</label><input type="range" data-k="barLevel"><output></output></div>
-  <div class="note">Distance and depth are % of the picture's height. Width is how much of its share of the edge each area covers.</div>
-</section>
+<div class="layout">
 
-<section class="card wide">
-  <h2>Colour</h2>
-  <div class="row" style="grid-template-columns:150px 1fr"><label>SDR / HDR</label>
-    <select data-k="hdrMode"><option value="auto">Automatic (from the video)</option><option value="sdr">Always the SDR set</option><option value="hdr">Always the HDR set</option></select></div>
-  <div class="tabs"><button class="tab on" type="button" data-set="sdr">SDR set<span class="dot"></span></button><button class="tab" type="button" data-set="hdr">HDR set<span class="dot"></span></button></div>
-  <div id="setRows"></div>
-  <div class="row" id="fixRow"><label>HDR correction</label><input type="range" data-k="hdr.fix" data-u="%"><output></output></div>
-  <div class="note" id="fixNote">HDR correction reads the picture as an HDR (PQ) signal and brings it down to SDR levels. Use it when HDR films look pale or too bright on the lights.</div>
-  <div style="margin-top:10px"><button class="small" type="button" id="resetSet">Reset this set</button></div>
-</section>
+  <!-- LIVE PREVIEW (sticky) -->
+  <section class="stage" aria-label="Live preview">
+    <div class="stagehead">
+      <h2>Live preview</h2>
+      <div class="seg" role="tablist">
+        <button class="on" type="button" data-view="after">After colour settings</button>
+        <button type="button" data-view="raw">As read from the picture</button>
+      </div>
+    </div>
+    <div class="viewer" id="viewer">
+      <div id="glows"></div>
+      <div class="screen" id="screen">
+        <div class="pic" id="pic"></div>
+        <div class="bar" id="barT" style="top:0"></div>
+        <div class="bar" id="barB" style="bottom:0"></div>
+        <div class="bar vbar" id="barL" style="left:0"></div>
+        <div class="bar vbar" id="barR" style="right:0"></div>
+        <div id="areas"></div>
+        <div class="empty" id="empty">Play something in Stremio to see the points.</div>
+      </div>
+    </div>
+    <div class="caption"><span id="capCount"><b>0</b> areas</span><span>Showing <b id="capView">after colour settings</b></span></div>
+  </section>
 
-<section class="card wide">
-  <h2>Playback</h2>
-  <label class="switch"><input type="checkbox" data-k="tunnel"> Tunneled playback</label>
-  <div class="note">Off by default. With it on, the video goes straight to the screen and never reaches the app, so the lights get nothing. Takes effect from the next video. Audio passthrough works either way.</div>
-  <div class="row" style="grid-template-columns:150px 120px"><label>Page port</label><input type="number" data-k="port"></div>
-  <div class="note">Takes effect the next time Stremio starts.</div>
-  <div style="margin-top:10px"><button class="small" type="button" id="resetAll">Reset everything (keeps the address and the port)</button></div>
-</section>
+  <div class="controls">
+
+    <!-- POINTS -->
+    <section class="card" aria-labelledby="hPoints">
+      <div class="cardhead"><h3 id="hPoints">Points</h3><p class="hint">% of picture height</p></div>
+      <p class="grouplabel">Number per edge</p>
+      <div class="grid2">
+        <div class="row"><div class="rowtop"><label>Top</label><output class="val"></output></div><input type="range" data-k="top"></div>
+        <div class="row"><div class="rowtop"><label>Bottom</label><output class="val"></output></div><input type="range" data-k="bottom"></div>
+        <div class="row"><div class="rowtop"><label>Left</label><output class="val"></output></div><input type="range" data-k="left"></div>
+        <div class="row"><div class="rowtop"><label>Right</label><output class="val"></output></div><input type="range" data-k="right"></div>
+      </div>
+      <div class="group">
+        <p class="grouplabel">Area size &amp; position</p>
+        <div class="row"><div class="rowtop"><label>Distance from edge</label><output class="val"></output></div><input type="range" data-k="inset" data-fmt="%"></div>
+        <div class="row"><div class="rowtop"><label>Area depth</label><output class="val"></output></div><input type="range" data-k="depth" data-fmt="%"></div>
+        <div class="row"><div class="rowtop"><label>Area width<small>of its share of the edge</small></label><output class="val"></output></div><input type="range" data-k="spread" data-fmt="%"></div>
+      </div>
+      <div class="group">
+        <label class="sw"><span class="t">Skip black bars<small>Move the areas inside letterbox bars</small></span><input type="checkbox" class="tg" data-k="bars"></label>
+        <div class="row"><div class="rowtop"><label>Black-bar level<small>0–255</small></label><output class="val"></output></div><input type="range" data-k="barLevel"></div>
+      </div>
+    </section>
+
+    <!-- COLOUR -->
+    <section class="card" aria-labelledby="hColour">
+      <div class="cardhead"><h3 id="hColour">Colour</h3></div>
+      <div class="modebox">
+        <label class="fl" for="mode">Which set is used</label>
+        <select id="mode" data-k="hdrMode">
+          <option value="auto">Automatic (from the video)</option>
+          <option value="sdr">Always the SDR set</option>
+          <option value="hdr">Always the HDR set</option>
+        </select>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab on" type="button" data-set="sdr"><span class="n">SDR set</span><span class="s"><span class="dot"></span><span class="st">Not in use</span></span></button>
+        <button class="tab" type="button" data-set="hdr"><span class="n">HDR set</span><span class="s"><span class="dot"></span><span class="st">Not in use</span></span></button>
+      </div>
+      <div class="editing" id="editing">Editing <b>SDR set</b> · <span id="editState"></span></div>
+
+      <div id="hdrLight" class="group hdrlight">
+        <p class="grouplabel">HDR light</p>
+        <p class="note">An HDR picture reaches the app as light in nits. These choose how much light is full LED white and how much LED range the highlights above it get.</p>
+        <div>
+          <label class="fl" for="hdrRead">How the HDR picture is read<small id="readNow"></small></label>
+          <select id="hdrRead" data-k="hdr.read">
+            <option value="auto">Automatic (from the decoder)</option>
+            <option value="android">Tone-mapped by Android (hardware decoder)</option>
+            <option value="pq">The HDR signal itself (software decoder)</option>
+            <option value="sdr">As is, like SDR (the old way)</option>
+          </select>
+        </div>
+        <div class="row"><div class="rowtop"><label>White level<small>nits shown as white</small></label><output class="val"></output></div><input type="range" data-k="hdr.white" data-fmt="nits"></div>
+        <div class="row"><div class="rowtop"><label>Highlight headroom<small>LED range kept above white</small></label><output class="val"></output></div><input type="range" data-k="hdr.headroom" data-fmt="%"></div>
+        <div class="row"><div class="rowtop"><label>Brightest highlight<small>about your TV's peak</small></label><output class="val"></output></div><input type="range" data-k="hdr.peak" data-fmt="nits"></div>
+        <svg id="curve" viewBox="0 0 300 120" aria-label="Light in nits to LED brightness"></svg>
+        <p class="note">Lower the white level for brighter lights. 203 nits is HDR's reference white. With headroom, white lights the LEDs below full, so brighter highlights still stand out.</p>
+      </div>
+
+      <div id="setRows"></div>
+      <button class="btn ghost" type="button" id="resetSet">Reset this set</button>
+    </section>
+
+    <!-- SECONDARY -->
+    <p class="sectionlabel">More settings</p>
+
+    <details class="card">
+      <summary><h3>HyperHDR connection</h3><span class="meta" id="metaHyper"></span></summary>
+      <div class="body">
+        <div>
+          <label class="fl" for="host">Address<small>Its flatbuffer server; port 19400 when left out</small></label>
+          <div class="field"><input type="text" id="host" placeholder="e.g. 192.168.0.50" inputmode="url" autocomplete="off" spellcheck="false"><button class="btn primary" type="button" id="save">Save</button></div>
+        </div>
+        <div class="row"><div class="rowtop"><label>Priority<small>lower number wins</small></label><output class="val"></output></div><input type="range" data-k="priority"></div>
+        <div class="row"><div class="rowtop"><label>Updates per second</label><output class="val"></output></div><input type="range" data-k="rate" data-fmt="/s"></div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><h3>Playback</h3><span class="meta" id="metaPlay"></span></summary>
+      <div class="body">
+        <label class="sw"><span class="t">Tunneled playback<small>When on, the video bypasses the app and the lights get nothing. Applies from the next video. Audio passthrough works either way.</small></span><input type="checkbox" class="tg" data-k="tunnel"></label>
+        <div>
+          <label class="fl">Page port<small>Applies the next time Stremio starts</small></label>
+          <input type="number" data-k="port" inputmode="numeric" style="max-width:160px">
+        </div>
+        <button class="btn danger" type="button" id="resetAll">Reset everything (keeps the address and the port)</button>
+      </div>
+    </details>
+
+    <footer id="diag"></footer>
+  </div>
 </div>
-<div class="foot" id="foot"></div>
-</main>
+</div>
 <script>
 "use strict";
-const SET_ROWS=[["bright","Brightness","%"],["black","Black level","%"],["gamma","Gamma",""],["sat","Saturation","%"],["temp","Colour temperature",""]];
-let S=null,R=null,P=null,tab="sdr",view="out",pending={},timer=null,lastErr=null;
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-function rows(){$("#setRows").innerHTML=SET_ROWS.map(([k,l,u])=>`<div class="row"><label>${l}</label><input type="range" data-k="${tab}.${k}" data-u="${u}"><output></output></div>`).join("");
-  $("#fixRow").style.display=tab==="hdr"?"":"none";$("#fixNote").style.display=tab==="hdr"?"":"none";bind();if(S)fill(true)}
-function fmt(k,v,u){if(k.endsWith(".gamma"))return(v/100).toFixed(2);if(k.endsWith(".temp"))return v==0?"neutral":(v<0?"warm "+(-v):"cool "+v);return v+(u||"")}
-function bind(){$$("[data-k]").forEach(el=>{if(el._b)return;el._b=1;const k=el.dataset.k;
-  const ev=el.type==="checkbox"||el.tagName==="SELECT"||el.type==="number"?"change":"input";
-  el.addEventListener(ev,()=>{let v=el.type==="checkbox"?(el.checked?"1":"0"):el.value;
-    if(el.type==="range"){const o=el.parentNode.querySelector("output");if(o)o.textContent=fmt(k,+v,el.dataset.u)}
-    send(k,v)})})}
+/* ===== UI helpers (from the design): slider fill + value labels ===== */
+function fmt(el){var v=+el.value,f=el.dataset.fmt;
+  if(f==='%')return v+'%';if(f==='gamma100')return (v/100).toFixed(2);if(f==='/s')return v+'/s';if(f==='nits')return v+' nits';
+  if(f==='temp')return v===0?'neutral':(v<0?'warm '+(-v):'cool '+v);return String(v);}
+function paint(el){var p=(el.value-el.min)/((el.max-el.min)||1)*100;el.style.setProperty('--p',p+'%');
+  var o=el.closest('.row')&&el.closest('.row').querySelector('output');if(o)o.textContent=fmt(el);}
+function paintAll(){document.querySelectorAll('input[type=range]').forEach(paint);}
+
+/* ===== the TV's live data ===== */
+var SET_ROWS=[["bright","Brightness","%"],["black","Black level","%"],["gamma","Gamma","gamma100"],["sat","Saturation","%"],["temp","Colour temperature","temp"]];
+var S=null,R=null,P=null,ST=null,tab="sdr",view="after",pending={},timer=null,lastErr=null,geoKey="",nodes=[],tabPicked=false;
+var $=function(s){return document.querySelector(s)},$$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function rows(){$("#setRows").innerHTML=SET_ROWS.map(function(r){return '<div class="row"><div class="rowtop"><label>'+r[1]+'</label><output class="val"></output></div><input type="range" data-k="'+tab+'.'+r[0]+'" data-fmt="'+r[2]+'"></div>'}).join("");
+  $("#hdrLight").style.display=tab==="hdr"?"":"none";
+  $$(".tab").forEach(function(x){x.classList.toggle("on",x.dataset.set===tab)});
+  if(S)fill(true);tabs();curve();}
 function send(k,v){pending[k]=v;clearTimeout(timer);timer=setTimeout(flush,120)}
-async function post(path,data){const body=new URLSearchParams(data).toString();
-  const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Ambient":"1"},body});
-  const j=await r.json().catch(()=>null);if(j)apply(j,true);return j}
-async function flush(){const d=pending;pending={};if(Object.keys(d).length)try{await post("/api/set",d)}catch(e){showErr("The TV did not answer: "+e)}}
-function showErr(t){const e=$("#err");e.style.display=t?"block":"none";e.textContent=t||""}
-function fill(force){$$("[data-k]").forEach(el=>{const k=el.dataset.k;if(!(k in S))return;if(!force&&(document.activeElement===el||k in pending))return;
-  const v=S[k],r=R[k];
-  if(el.type==="checkbox")el.checked=!!v;else if(el.type==="range"){el.min=r.min;el.max=r.max;el.value=v;const o=el.parentNode.querySelector("output");if(o)o.textContent=fmt(k,v,el.dataset.u)}
-  else el.value=v});
-  if(force||document.activeElement!==$("#host"))$("#host").value=S.host}
-function pill(label,text,cls){return`<span class="pill">${label}: <b class="${cls||""}">${esc(text)}</b></span>`}
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c])}
-function apply(j,fromPost){const first=!S;S=j.settings;R=j.ranges;P=j.preview;const st=j.status;
+function post(path,data){return fetch(path,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Ambient":"1"},body:new URLSearchParams(data).toString()})
+  .then(function(r){return r.json()}).then(function(j){apply(j,true);return j}).catch(function(e){showErr("The TV did not answer: "+e)})}
+function flush(){var d=pending;pending={};if(Object.keys(d).length)post("/api/set",d)}
+function showErr(t){var e=$("#err");e.style.display=t?"block":"none";e.textContent=t||""}
+function fill(force){$$("[data-k]").forEach(function(el){var k=el.dataset.k;if(!(k in S))return;
+    if(!force&&(document.activeElement===el||k in pending))return;var v=S[k],r=R[k];
+    if(el.type==="checkbox")el.checked=!!v;
+    else if(el.type==="range"){el.min=r.min;el.max=r.max;el.step=1;el.value=v;paint(el)}
+    else{if(el.type==="number"){el.min=r.min;el.max=r.max}el.value=v}});
+  if(force||document.activeElement!==$("#host"))$("#host").value=S.host;}
+function pill(label,text,cls,dot){return '<div class="pill">'+(dot?'<span class="dot '+(cls==="ok"?"":cls)+'"></span>':'')+label+': <span class="'+(cls||"")+'">'+esc(text)+'</span></div>'}
+function tabs(){if(!ST)return;var live=ST.activeSet;
+  $$(".tab").forEach(function(x){var l=x.dataset.set===live;x.classList.toggle("live",l);x.querySelector(".st").textContent=l?"In use now":"Not in use"});
+  $("#editing b").textContent=tab.toUpperCase()+" set";
+  $("#editState").textContent=tab===live?"in use now, the preview shows it":"not in use now, changes show when it is";}
+var READ={android:"tone-mapped by Android",pq:"the HDR signal itself",sdr:"as is, like SDR"};
+function apply(j,fromPost){var first=!S;S=j.settings;R=j.ranges;P=j.preview;ST=j.status;
   if(fromPost||j.error!==lastErr){showErr(j.error);lastErr=j.error}
+  if(first&&!tabPicked){tab=ST.activeSet==="hdr"?"hdr":"sdr";rows()}
   fill(first);
-  const h=st.hyperhdr,hc=/^connected/.test(h)?"ok":/not set|cannot|off/.test(h)?"bad":"warn";
-  const c=st.capture,cc=c==="sending"?"ok":/tunneled|failed/.test(c)?"bad":"warn";
-  $("#pills").innerHTML=pill("HyperHDR",h,hc)+pill("Picture",c,cc)+pill("Colour set",st.activeSet.toUpperCase()+(S.hdrMode==="auto"?" (auto)":" (fixed)"),"")+pill("Rate",st.fps+"/s","");
-  $$(".tab[data-set]").forEach(b=>b.classList.toggle("live",b.dataset.set===st.activeSet));
-  $("#foot").innerHTML=`Video: ${esc(st.video)}${st.videoAt?" · "+new Date(st.videoAt).toLocaleTimeString():""} · copy ${st.copyMs} ms · ${st.copies} copies, ${st.copyFailures} failed · ${st.sent} sent<br>Page: http://${esc(st.tv||location.hostname)}:${S.port} · app ${esc(st.app)}`;
-  try{draw()}catch(e){console.warn(e)}}
-function draw(){const cv=$("#cv"),g=cv.getContext("2d"),W=cv.width,H=cv.height,X=80,Y=70,SW=960,SH=540;
-  g.clearRect(0,0,W,H);
-  // right after a change of the counts the settings are newer than the last frame: draw that frame's own points only
-  const has=P&&P.areas&&P.areas.length&&P.out.length===S.top+S.right+S.bottom+S.left;$("#pvNote").style.display=P&&P.areas&&P.areas.length?"none":"";
-  if(has){const cols=view==="out"?P.out:P.raw,n=[S.top,S.right,S.bottom,S.left];let k=0;
-    // the glow: one soft light per point, just outside its edge of the screen
-    g.globalCompositeOperation="lighter";
-    for(let side=0;side<4;side++)for(let i=0;i<n[side];i++,k++){const f=(i+.5)/n[side];
-      const x=side===0||side===2?X+f*SW:(side===1?X+SW+18:X-18),y=side===1||side===3?Y+f*SH:(side===0?Y-18:Y+SH+18);
-      const r=Math.max(40,(side%2?SH:SW)/n[side]*.9),c="#"+cols[k],gr=g.createRadialGradient(x,y,0,x,y,r);
-      gr.addColorStop(0,c+"cc");gr.addColorStop(1,c+"00");g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r)}
-    g.globalCompositeOperation="source-over"}
-  g.fillStyle="#050409";g.fillRect(X,Y,SW,SH);g.strokeStyle="#2b2650";g.lineWidth=2;g.strokeRect(X,Y,SW,SH);
-  if(!has)return;
-  const cols=view==="out"?P.out:P.raw,c=P.content;
-  if(c){g.strokeStyle="#4a4385";g.setLineDash([6,6]);g.strokeRect(X+c[0]/P.w*SW,Y+c[1]/P.h*SH,(c[2]-c[0]+1)/P.w*SW,(c[3]-c[1]+1)/P.h*SH);g.setLineDash([])}
-  for(let i=0;i<cols.length;i++){const a=P.areas.slice(4*i,4*i+4),x=X+a[0]*SW,y=Y+a[1]*SH,w=(a[2]-a[0])*SW,h=(a[3]-a[1])*SH;
-    g.fillStyle="#"+cols[i];g.fillRect(x,y,w,h);g.strokeStyle="rgba(255,255,255,.35)";g.lineWidth=1;g.strokeRect(x+.5,y+.5,w-1,h-1)}}
-async function poll(){if(document.visibilityState==="visible")try{const r=await fetch("/api/state",{cache:"no-store"});apply(await r.json(),false)}catch(e){}
-  setTimeout(poll,P&&P.areas&&P.areas.length?300:1000)}
-$$(".tab[data-set]").forEach(b=>b.onclick=()=>{tab=b.dataset.set;$$(".tab[data-set]").forEach(x=>x.classList.toggle("on",x===b));rows()});
-$("#pvOut").onclick=()=>{view="out";$("#pvOut").classList.add("on");$("#pvRaw").classList.remove("on");draw()};
-$("#pvRaw").onclick=()=>{view="raw";$("#pvRaw").classList.add("on");$("#pvOut").classList.remove("on");draw()};
-$("#hostSave").onclick=()=>post("/api/set",{host:$("#host").value.trim()});
-$("#host").addEventListener("keydown",e=>{if(e.key==="Enter")$("#hostSave").click()});
-$("#resetSet").onclick=()=>{if(confirm("Reset the "+tab.toUpperCase()+" set to its defaults?"))post("/api/reset",{prefix:tab+"."})};
-$("#resetAll").onclick=()=>{if(confirm("Reset every setting except the HyperHDR address and the port?"))post("/api/reset",{prefix:""})};
-rows();poll();
+  var h=ST.hyperhdr,hc=/^connected/.test(h)?"ok":/not set|cannot|off/.test(h)?"bad":"warn";
+  var c=ST.capture,cc=c==="sending"?"ok":/tunneled|failed/.test(c)?"bad":"warn";
+  $("#pills").innerHTML=pill("HyperHDR",h,hc,true)+pill("Picture",c,cc)+'<div class="pill">Colour set: <b>'+esc(ST.activeSet.toUpperCase())+(S.hdrMode==="auto"?" (auto)":" (fixed)")+'</b></div><div class="pill">Rate: <b>'+ST.fps+'/s</b></div>';
+  tabs();
+  $("#readNow").textContent=ST.videoHdr?("Now: "+(READ[ST.hdrReading]||"—")+(S["hdr.read"]==="auto"?" (automatic)":"")):"Now: the video is not HDR";
+  $("#metaHyper").textContent=S.host?(S.host+" · priority "+S.priority):"address not set";
+  $("#metaPlay").textContent="Tunneled "+(S.tunnel?"on":"off")+" · port "+S.port;
+  $("#diag").innerHTML="Video: "+esc(ST.video)+(ST.videoAt?" · "+new Date(ST.videoAt).toLocaleTimeString():"")+" · copy "+ST.copyMs+" ms · "+ST.copies+" copies, "+ST.copyFailures+" failed · "+ST.sent+" sent<br>Page: http://"+esc(ST.tv||location.hostname)+":"+S.port+" · app "+esc(ST.app);
+  document.body.classList.toggle("lightsoff",!S.enabled);
+  curve();
+  try{preview()}catch(e){console.warn(e)}}
+
+/* ===== preview: one .area per point in #screen, a .glow just outside it in #glows ===== */
+function preview(){var has=P&&P.areas&&P.areas.length&&P.out.length===S.top+S.right+S.bottom+S.left;
+  $("#empty").style.display=P&&P.areas&&P.areas.length?"none":"flex";
+  if(!has){if(!(P&&P.areas&&P.areas.length)){$("#areas").innerHTML="";$("#glows").innerHTML="";nodes=[];geoKey=""}return}
+  var sc=$("#screen"),W=sc.clientWidth,H=sc.clientHeight,key=P.areas.map(function(a){return Math.round(a*200)}).join(",")+"|"+W+"x"+H;
+  if(key!==geoKey){geoKey=key;var A=$("#areas"),G=$("#glows");A.innerHTML="";G.innerHTML="";nodes=[];
+    var n=[S.top,S.right,S.bottom,S.left],side=0,left=n[0],push=16;
+    for(var i=0;i<P.out.length;i++){while(i>=left&&side<3){side++;left+=n[side]}
+      var a=P.areas.slice(4*i,4*i+4),x=a[0]*W,y=a[1]*H,w=(a[2]-a[0])*W,h=(a[3]-a[1])*H;
+      var d=document.createElement("div");d.className="area";d.style.cssText="left:"+x+"px;top:"+y+"px;width:"+w+"px;height:"+h+"px";A.appendChild(d);
+      var g=document.createElement("div");g.className="glow";var gs=Math.max(w,h,18)*1.5,ex=side===1?push:side===3?-push:0,ey=side===0?-push:side===2?push:0;
+      g.style.cssText="left:"+(sc.offsetLeft+x+w/2-gs/2+ex)+"px;top:"+(sc.offsetTop+y+h/2-gs/2+ey)+"px;width:"+gs+"px;height:"+gs+"px";G.appendChild(g);
+      nodes.push({d:d,g:g})}
+    $("#capCount").innerHTML="<b>"+nodes.length+"</b> areas"}
+  var cols=view==="after"?P.out:P.raw,sum=[0,0,0];
+  for(var k=0;k<nodes.length;k++){var c="#"+cols[k];nodes[k].d.style.backgroundColor=nodes[k].g.style.backgroundColor=c;
+    sum[0]+=parseInt(cols[k].substr(0,2),16);sum[1]+=parseInt(cols[k].substr(2,2),16);sum[2]+=parseInt(cols[k].substr(4,2),16)}
+  var m=sum.map(function(v){return Math.round(v/Math.max(1,nodes.length))}),amb="rgb("+m.join(",")+")";
+  document.body.style.setProperty("--amb",amb);$("#pic").style.background="radial-gradient(ellipse at 50% 50%,"+amb+",#0e0b18 75%)";
+  var cc=P.content,bars=S.bars&&cc;sc.classList.toggle("bars",!!bars);
+  if(bars){$("#barT").style.height=(cc[1]/P.h*100)+"%";$("#barB").style.height=((P.h-1-cc[3])/P.h*100)+"%";
+    $("#barL").style.width=(cc[0]/P.w*100)+"%";$("#barR").style.width=((P.w-1-cc[2])/P.w*100)+"%"}
+  $("#capView").textContent=view==="after"?"after colour settings":"as read from the picture"}
+
+/* ===== the HDR light curve: nits (log scale) to LED brightness, the same formula as the TV (Hdr.Curve) ===== */
+function led(n,w,p,hr){if(n<=0)return 0;var b=1-hr;if(n<=w)return b*n/w;if(hr===0||n>=p)return 1;var t=(n-w)/(p-w);return b+hr*t*(2-t)}
+function curve(){if(tab!=="hdr"||!S)return;var w=S["hdr.white"],p=S["hdr.peak"],hr=S["hdr.headroom"]/100,X=function(n){return 24+Math.log10(Math.max(1,n))/Math.log10(4000)*268},Y=function(l){return 108-Math.pow(l,1/2.2)*96};
+  var pts=[];for(var i=0;i<=120;i++){var n=Math.pow(4000,i/120);pts.push(X(n).toFixed(1)+","+Y(led(n,w,p,hr)).toFixed(1))}
+  var ticks=[1,10,100,1000,4000].map(function(n){return '<line x1="'+X(n)+'" y1="10" x2="'+X(n)+'" y2="108" stroke="#2a2650"/><text x="'+(n===4000?X(n)-22:X(n)-4)+'" y="118">'+n+'</text>'}).join("");
+  $("#curve").innerHTML=ticks+'<text x="2" y="14">LED</text><line x1="'+X(w)+'" y1="10" x2="'+X(w)+'" y2="108" stroke="#9b83ff" stroke-dasharray="3 3"/><line x1="'+X(p)+'" y1="10" x2="'+X(p)+'" y2="108" stroke="#fbbf24" stroke-dasharray="3 3"/>'+
+    '<polyline fill="none" stroke="#7c5cff" stroke-width="2.5" points="'+pts.join(" ")+'"/><text x="'+(X(w)+3)+'" y="20" style="fill:#9b83ff">white</text><text x="'+(Math.min(X(p),250)+3)+'" y="30" style="fill:#fbbf24">peak</text>'}
+
+/* ===== events ===== */
+document.addEventListener("input",function(e){var el=e.target,k=el.dataset&&el.dataset.k;if(el.type==="range")paint(el);if(!k||el.type!=="range")return;
+  if(S)S[k]=+el.value;if(k.indexOf("hdr.")===0)curve();send(k,el.value)});
+document.addEventListener("change",function(e){var el=e.target,k=el.dataset&&el.dataset.k;if(!k||el.type==="range")return;
+  send(k,el.type==="checkbox"?(el.checked?"1":"0"):el.value)});
+$$(".tab").forEach(function(x){x.onclick=function(){tab=x.dataset.set;tabPicked=true;rows()}});
+$$("[data-view]").forEach(function(b){b.onclick=function(){view=b.dataset.view;$$("[data-view]").forEach(function(x){x.classList.toggle("on",x===b)});try{preview()}catch(e){}}});
+$("#save").onclick=function(){post("/api/set",{host:$("#host").value.trim()})};
+$("#host").addEventListener("keydown",function(e){if(e.key==="Enter")$("#save").click()});
+$("#resetSet").onclick=function(){if(confirm("Reset the "+tab.toUpperCase()+" set to its defaults?"))post("/api/reset",{prefix:tab+"."})};
+$("#resetAll").onclick=function(){if(confirm("Reset every setting except the HyperHDR address and the port?"))post("/api/reset",{prefix:""})};
+window.addEventListener("resize",function(){geoKey="";try{preview()}catch(e){}});
+function poll(){var next=function(){setTimeout(poll,P&&P.areas&&P.areas.length?300:1000)};
+  if(document.visibilityState!=="visible")return next();
+  fetch("/api/state",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){apply(j,false)}).catch(function(){}).then(next)}
+rows();paintAll();poll();
 </script>
 </body>
 </html>
