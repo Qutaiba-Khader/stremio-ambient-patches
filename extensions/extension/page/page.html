@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stremio Ambient</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%237b5bf5%27/%3E%3C/svg%3E">
+<style>
+:root{--bg:#0d0b1a;--card:#17142b;--line:#2b2650;--text:#ece9ff;--dim:#a39fc4;--acc:#7b5bf5;--ok:#3ccf8e;--warn:#f5b84b;--bad:#ff6b7d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 2px}
+h2{font-size:16px;margin:0 0 10px;color:var(--text)}
+.sub{color:var(--dim);font-size:13px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
+.pill{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;background:var(--card)}
+.pill b{font-weight:600}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.wide{grid-column:1/-1}
+.row{display:grid;grid-template-columns:150px 1fr 56px;align-items:center;gap:10px;margin:7px 0}
+@media(max-width:420px){.row{grid-template-columns:110px 1fr 48px}}
+.row label{color:var(--dim);font-size:13px}
+.row output{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=text],input[type=number],select{width:100%;background:#0f0d20;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit}
+.switch{display:flex;align-items:center;gap:10px;margin:8px 0;cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--acc)}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{background:#0f0d20;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:6px 14px;cursor:pointer;font:inherit}
+.tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.tab .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-left:6px;vertical-align:middle;visibility:hidden}
+.tab.live .dot{visibility:visible}
+button.small{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+.hostrow{display:flex;gap:8px}
+.hostrow button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:0 14px;cursor:pointer;font:inherit}
+.note{color:var(--dim);font-size:12.5px;margin:4px 0 0}
+#err{display:none;background:#3a1622;border:1px solid var(--bad);color:#ffd5db;border-radius:10px;padding:8px 12px;margin:0 0 12px}
+#wrap{position:relative;width:100%;aspect-ratio:1120/680;margin:8px 0 6px}
+canvas{width:100%;height:100%;display:block}
+.prevbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.foot{color:var(--dim);font-size:12.5px;margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Stremio Ambient</h1>
+<div class="sub">The colours along the picture's edges go to HyperHDR while Stremio plays. Every change applies at once and is saved on the TV.</div>
+<div class="pills" id="pills"></div>
+<div id="err"></div>
+
+<div class="grid">
+<section class="card wide">
+  <h2>Live preview</h2>
+  <div class="prevbar">
+    <button class="tab on" id="pvOut" type="button">After colour settings</button>
+    <button class="tab" id="pvRaw" type="button">As read from the picture</button>
+  </div>
+  <div id="wrap"><canvas id="cv" width="1120" height="680"></canvas></div>
+  <div class="note" id="pvNote">Play something in Stremio to see the points.</div>
+</section>
+
+<section class="card">
+  <h2>HyperHDR</h2>
+  <label class="switch"><input type="checkbox" data-k="enabled"> Ambient light on</label>
+  <div class="note" style="margin:6px 0 4px">HyperHDR address (its flatbuffer server; port 19400 when left out)</div>
+  <div class="hostrow"><input type="text" id="host" placeholder="e.g. 192.168.0.50 or 192.168.0.50:19400" autocomplete="off" spellcheck="false"><button type="button" id="hostSave">Save</button></div>
+  <div class="row"><label>Priority</label><input type="range" data-k="priority"><output></output></div>
+  <div class="note" style="margin-top:-2px">In HyperHDR the lower number wins.</div>
+  <div class="row"><label>Updates per second</label><input type="range" data-k="rate"><output></output></div>
+</section>
+
+<section class="card">
+  <h2>Points</h2>
+  <div class="row"><label>Top</label><input type="range" data-k="top"><output></output></div>
+  <div class="row"><label>Bottom</label><input type="range" data-k="bottom"><output></output></div>
+  <div class="row"><label>Left</label><input type="range" data-k="left"><output></output></div>
+  <div class="row"><label>Right</label><input type="range" data-k="right"><output></output></div>
+  <div class="row"><label>Distance from edge</label><input type="range" data-k="inset" data-u="%"><output></output></div>
+  <div class="row"><label>Area depth</label><input type="range" data-k="depth" data-u="%"><output></output></div>
+  <div class="row"><label>Area width</label><input type="range" data-k="spread" data-u="%"><output></output></div>
+  <label class="switch"><input type="checkbox" data-k="bars"> Skip black bars</label>
+  <div class="row"><label>Black-bar level</label><input type="range" data-k="barLevel"><output></output></div>
+  <div class="note">Distance and depth are % of the picture's height. Width is how much of its share of the edge each area covers.</div>
+</section>
+
+<section class="card wide">
+  <h2>Colour</h2>
+  <div class="row" style="grid-template-columns:150px 1fr"><label>SDR / HDR</label>
+    <select data-k="hdrMode"><option value="auto">Automatic (from the video)</option><option value="sdr">Always the SDR set</option><option value="hdr">Always the HDR set</option></select></div>
+  <div class="tabs"><button class="tab on" type="button" data-set="sdr">SDR set<span class="dot"></span></button><button class="tab" type="button" data-set="hdr">HDR set<span class="dot"></span></button></div>
+  <div id="setRows"></div>
+  <div class="row" id="fixRow"><label>HDR correction</label><input type="range" data-k="hdr.fix" data-u="%"><output></output></div>
+  <div class="note" id="fixNote">HDR correction reads the picture as an HDR (PQ) signal and brings it down to SDR levels. Use it when HDR films look pale or too bright on the lights.</div>
+  <div style="margin-top:10px"><button class="small" type="button" id="resetSet">Reset this set</button></div>
+</section>
+
+<section class="card wide">
+  <h2>Playback</h2>
+  <label class="switch"><input type="checkbox" data-k="tunnel"> Tunneled playback</label>
+  <div class="note">Off by default. With it on, the video goes straight to the screen and never reaches the app, so the lights get nothing. Takes effect from the next video. Audio passthrough works either way.</div>
+  <div class="row" style="grid-template-columns:150px 120px"><label>Page port</label><input type="number" data-k="port"></div>
+  <div class="note">Takes effect the next time Stremio starts.</div>
+  <div style="margin-top:10px"><button class="small" type="button" id="resetAll">Reset everything (keeps the address and the port)</button></div>
+</section>
+</div>
+<div class="foot" id="foot"></div>
+</main>
+<script>
+"use strict";
+const SET_ROWS=[["bright","Brightness","%"],["black","Black level","%"],["gamma","Gamma",""],["sat","Saturation","%"],["temp","Colour temperature",""]];
+let S=null,R=null,P=null,tab="sdr",view="out",pending={},timer=null,lastErr=null;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+function rows(){$("#setRows").innerHTML=SET_ROWS.map(([k,l,u])=>`<div class="row"><label>${l}</label><input type="range" data-k="${tab}.${k}" data-u="${u}"><output></output></div>`).join("");
+  $("#fixRow").style.display=tab==="hdr"?"":"none";$("#fixNote").style.display=tab==="hdr"?"":"none";bind();if(S)fill(true)}
+function fmt(k,v,u){if(k.endsWith(".gamma"))return(v/100).toFixed(2);if(k.endsWith(".temp"))return v==0?"neutral":(v<0?"warm "+(-v):"cool "+v);return v+(u||"")}
+function bind(){$$("[data-k]").forEach(el=>{if(el._b)return;el._b=1;const k=el.dataset.k;
+  const ev=el.type==="checkbox"||el.tagName==="SELECT"||el.type==="number"?"change":"input";
+  el.addEventListener(ev,()=>{let v=el.type==="checkbox"?(el.checked?"1":"0"):el.value;
+    if(el.type==="range"){const o=el.parentNode.querySelector("output");if(o)o.textContent=fmt(k,+v,el.dataset.u)}
+    send(k,v)})})}
+function send(k,v){pending[k]=v;clearTimeout(timer);timer=setTimeout(flush,120)}
+async function post(path,data){const body=new URLSearchParams(data).toString();
+  const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Ambient":"1"},body});
+  const j=await r.json().catch(()=>null);if(j)apply(j,true);return j}
+async function flush(){const d=pending;pending={};if(Object.keys(d).length)try{await post("/api/set",d)}catch(e){showErr("The TV did not answer: "+e)}}
+function showErr(t){const e=$("#err");e.style.display=t?"block":"none";e.textContent=t||""}
+function fill(force){$$("[data-k]").forEach(el=>{const k=el.dataset.k;if(!(k in S))return;if(!force&&(document.activeElement===el||k in pending))return;
+  const v=S[k],r=R[k];
+  if(el.type==="checkbox")el.checked=!!v;else if(el.type==="range"){el.min=r.min;el.max=r.max;el.value=v;const o=el.parentNode.querySelector("output");if(o)o.textContent=fmt(k,v,el.dataset.u)}
+  else el.value=v});
+  if(force||document.activeElement!==$("#host"))$("#host").value=S.host}
+function pill(label,text,cls){return`<span class="pill">${label}: <b class="${cls||""}">${esc(text)}</b></span>`}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c])}
+function apply(j,fromPost){const first=!S;S=j.settings;R=j.ranges;P=j.preview;const st=j.status;
+  if(fromPost||j.error!==lastErr){showErr(j.error);lastErr=j.error}
+  fill(first);
+  const h=st.hyperhdr,hc=/^connected/.test(h)?"ok":/not set|cannot|off/.test(h)?"bad":"warn";
+  const c=st.capture,cc=c==="sending"?"ok":/tunneled|failed/.test(c)?"bad":"warn";
+  $("#pills").innerHTML=pill("HyperHDR",h,hc)+pill("Picture",c,cc)+pill("Colour set",st.activeSet.toUpperCase()+(S.hdrMode==="auto"?" (auto)":" (fixed)"),"")+pill("Rate",st.fps+"/s","");
+  $$(".tab[data-set]").forEach(b=>b.classList.toggle("live",b.dataset.set===st.activeSet));
+  $("#foot").innerHTML=`Video: ${esc(st.video)}${st.videoAt?" · "+new Date(st.videoAt).toLocaleTimeString():""} · copy ${st.copyMs} ms · ${st.copies} copies, ${st.copyFailures} failed · ${st.sent} sent<br>Page: http://${esc(st.tv||location.hostname)}:${S.port} · app ${esc(st.app)}`;
+  try{draw()}catch(e){console.warn(e)}}
+function draw(){const cv=$("#cv"),g=cv.getContext("2d"),W=cv.width,H=cv.height,X=80,Y=70,SW=960,SH=540;
+  g.clearRect(0,0,W,H);
+  // right after a change of the counts the settings are newer than the last frame: draw that frame's own points only
+  const has=P&&P.areas&&P.areas.length&&P.out.length===S.top+S.right+S.bottom+S.left;$("#pvNote").style.display=P&&P.areas&&P.areas.length?"none":"";
+  if(has){const cols=view==="out"?P.out:P.raw,n=[S.top,S.right,S.bottom,S.left];let k=0;
+    // the glow: one soft light per point, just outside its edge of the screen
+    g.globalCompositeOperation="lighter";
+    for(let side=0;side<4;side++)for(let i=0;i<n[side];i++,k++){const f=(i+.5)/n[side];
+      const x=side===0||side===2?X+f*SW:(side===1?X+SW+18:X-18),y=side===1||side===3?Y+f*SH:(side===0?Y-18:Y+SH+18);
+      const r=Math.max(40,(side%2?SH:SW)/n[side]*.9),c="#"+cols[k],gr=g.createRadialGradient(x,y,0,x,y,r);
+      gr.addColorStop(0,c+"cc");gr.addColorStop(1,c+"00");g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r)}
+    g.globalCompositeOperation="source-over"}
+  g.fillStyle="#050409";g.fillRect(X,Y,SW,SH);g.strokeStyle="#2b2650";g.lineWidth=2;g.strokeRect(X,Y,SW,SH);
+  if(!has)return;
+  const cols=view==="out"?P.out:P.raw,c=P.content;
+  if(c){g.strokeStyle="#4a4385";g.setLineDash([6,6]);g.strokeRect(X+c[0]/P.w*SW,Y+c[1]/P.h*SH,(c[2]-c[0]+1)/P.w*SW,(c[3]-c[1]+1)/P.h*SH);g.setLineDash([])}
+  for(let i=0;i<cols.length;i++){const a=P.areas.slice(4*i,4*i+4),x=X+a[0]*SW,y=Y+a[1]*SH,w=(a[2]-a[0])*SW,h=(a[3]-a[1])*SH;
+    g.fillStyle="#"+cols[i];g.fillRect(x,y,w,h);g.strokeStyle="rgba(255,255,255,.35)";g.lineWidth=1;g.strokeRect(x+.5,y+.5,w-1,h-1)}}
+async function poll(){if(document.visibilityState==="visible")try{const r=await fetch("/api/state",{cache:"no-store"});apply(await r.json(),false)}catch(e){}
+  setTimeout(poll,P&&P.areas&&P.areas.length?300:1000)}
+$$(".tab[data-set]").forEach(b=>b.onclick=()=>{tab=b.dataset.set;$$(".tab[data-set]").forEach(x=>x.classList.toggle("on",x===b));rows()});
+$("#pvOut").onclick=()=>{view="out";$("#pvOut").classList.add("on");$("#pvRaw").classList.remove("on");draw()};
+$("#pvRaw").onclick=()=>{view="raw";$("#pvRaw").classList.add("on");$("#pvOut").classList.remove("on");draw()};
+$("#hostSave").onclick=()=>post("/api/set",{host:$("#host").value.trim()});
+$("#host").addEventListener("keydown",e=>{if(e.key==="Enter")$("#hostSave").click()});
+$("#resetSet").onclick=()=>{if(confirm("Reset the "+tab.toUpperCase()+" set to its defaults?"))post("/api/reset",{prefix:tab+"."})};
+$("#resetAll").onclick=()=>{if(confirm("Reset every setting except the HyperHDR address and the port?"))post("/api/reset",{prefix:""})};
+rows();poll();
+</script>
+</body>
+</html>
