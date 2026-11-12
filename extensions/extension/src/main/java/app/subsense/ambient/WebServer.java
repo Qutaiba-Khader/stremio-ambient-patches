@@ -143,8 +143,8 @@ final class WebServer extends Thread {
                     err = ambient.change(form);
                 } else {
                     String prefix = form.containsKey("prefix") ? form.get("prefix") : "";
-                    if (!prefix.isEmpty() && !prefix.equals("sdr.") && !prefix.equals("hdr.")) {
-                        reply(out, 400, "text/plain", "prefix: sdr., hdr. or empty");
+                    if (!prefix.isEmpty() && !prefix.equals("sdr.") && !prefix.equals("hdr.") && !prefix.equals("points")) {
+                        reply(out, 400, "text/plain", "prefix: sdr., hdr., points or empty");
                         return;
                     }
                     ambient.reset(prefix);

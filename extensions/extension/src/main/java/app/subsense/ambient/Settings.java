@@ -45,7 +45,9 @@ final class Settings {
             i("depth", 10, 1, 50),              // how far each area reaches into the picture, % of the height
             i("spread", 100, 10, 100),          // how much of its share of the edge each area covers, %
             b("bars", true),                    // skip black bars (letterbox / pillarbox)
-            i("barLevel", 24, 1, 100),          // a row or column is a bar when no pixel in it is brighter than this (0-255)
+            // a row or column is a bar when no pixel in it is brighter: 2 = true black only (a video's own black arrives as 0-1
+            // after the GPU's YUV-to-RGB rounding, measured 01,00,01); a dark picture (5 and up) is never a bar
+            i("barLevel", 2, 0, 32),
             new Def("hdrMode", CHOICE, "auto", 0, 0, "auto", "sdr", "hdr"),
             b("tunnel", false),                 // tunneled playback: the picture then never reaches the app (no LED)
             i("port", 8095, 1024, 65535),       // this page's port (from the next start of the app)
@@ -124,10 +126,14 @@ final class Settings {
         }
     }
 
-    /** Puts back the defaults of the keys that start with prefix ("" = all, except the HyperHDR address and the port). */
+    /** Puts back the defaults of the keys that start with prefix ("" = all, except the HyperHDR address and the port;
+     * "points" = the Points card). */
+    /** The Points card's settings (reset together). */
+    static final java.util.List<String> POINT_KEYS = java.util.Arrays.asList("top", "bottom", "left", "right", "inset", "depth", "spread", "bars", "barLevel");
+
     synchronized void reset(String prefix) {
         for (Def d : DEFS) {
-            if (!d.key.startsWith(prefix)) continue;
+            if (prefix.equals("points") ? !POINT_KEYS.contains(d.key) : !d.key.startsWith(prefix)) continue;
             if (prefix.isEmpty() && (d.key.equals("host") || d.key.equals("port"))) continue;
             values.put(d.key, d.def);
         }

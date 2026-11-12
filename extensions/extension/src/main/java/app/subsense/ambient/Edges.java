@@ -47,7 +47,11 @@ final class Edges {
 
     /** Samples one frame (w x h ARGB pixels). previous = the last frame's content, kept when the frame is all dark. */
     static Result sample(int[] px, int w, int h, Params p, int[] previous) {
-        int[] c = p.bars ? content(px, w, h, p.barLevel, previous) : new int[]{0, 0, w - 1, h - 1};
+        return sampleIn(px, w, h, p, p.bars ? content(px, w, h, p.barLevel, previous) : new int[]{0, 0, w - 1, h - 1});
+    }
+
+    /** Samples inside given picture bounds (left, top, right, bottom, inclusive). */
+    static Result sampleIn(int[] px, int w, int h, Params p, int[] c) {
         int l = c[0], t = c[1], r = c[2], b = c[3];
         float cw = r - l + 1, ch = b - t + 1;
         float inset = ch * p.inset / 100f, depth = Math.max(1f, ch * p.depth / 100f);
@@ -109,18 +113,60 @@ final class Edges {
     }
 
     /**
-     * The picture inside black bars: rows/columns from each edge in which no channel of any pixel reaches level, at most a
-     * third of the frame from each side. A frame that is dark all over (a black scene) keeps the previous bounds.
+     * The picture inside black bars. A row or column is a bar only when NO pixel in it is brighter than level
+     * (0 = only true black, the default: an OLED's black is zero, and a dark picture is never a bar). Bars come in pairs
+     * (letterbox top + bottom, pillarbox left + right), so each pair keeps the smaller of the two sides: a dark area on
+     * one side only is picture. At most a third of the frame per side. A frame dark all over (a black scene) keeps the
+     * previous bounds.
      */
     static int[] content(int[] px, int w, int h, int level, int[] previous) {
-        int t = 0, b = h - 1, l = 0, r = w - 1;
-        while (t < h / 3 && rowMax(px, w, t) < level) t++;
-        while (b > h - 1 - h / 3 && rowMax(px, w, b) < level) b--;
-        boolean allDark = t >= h / 3 && b <= h - 1 - h / 3 && rowMax(px, w, h / 2) < level;
+        int t = 0, b = 0, l = 0, r = 0;
+        while (t < h / 3 && rowMax(px, w, t) <= level) t++;
+        while (b < h / 3 && rowMax(px, w, h - 1 - b) <= level) b++;
+        boolean allDark = t >= h / 3 && b >= h / 3 && rowMax(px, w, h / 2) <= level;
         if (allDark) return previous != null ? previous.clone() : new int[]{0, 0, w - 1, h - 1};
-        while (l < w / 3 && colMax(px, w, l, t, b) < level) l++;
-        while (r > w - 1 - w / 3 && colMax(px, w, r, t, b) < level) r--;
-        return new int[]{l, t, r, b};
+        int v = Math.min(t, b);
+        while (l < w / 3 && colMax(px, w, l, v, h - 1 - v) <= level) l++;
+        while (r < w / 3 && colMax(px, w, w - 1 - r, v, h - 1 - v) <= level) r++;
+        int u = Math.min(l, r);
+        return new int[]{u, v, w - 1 - u, h - 1 - v};
+    }
+
+    /**
+     * Keeps the black-bar bounds steady: a new result is taken only once it has held (within one pixel) for holdMs, so
+     * a dark moment or a scene change does not make the areas jump. Pure (the time is given), one per video.
+     */
+    static final class BarTracker {
+        private int[] current, candidate;
+        private long since;
+
+        int[] update(int[] found, long now, long holdMs) {
+            if (current == null) {
+                current = found.clone();
+                return current;
+            }
+            if (near(found, current)) {
+                candidate = null;
+                return current;
+            }
+            if (candidate == null || !near(found, candidate)) {
+                candidate = found.clone();
+                since = now;
+            } else if (now - since >= holdMs) {
+                current = candidate;
+                candidate = null;
+            }
+            return current;
+        }
+
+        void reset() {
+            current = candidate = null;
+        }
+
+        private static boolean near(int[] a, int[] b) {
+            for (int i = 0; i < 4; i++) if (Math.abs(a[i] - b[i]) > 1) return false;
+            return true;
+        }
     }
 
     private static int rowMax(int[] px, int w, int y) {

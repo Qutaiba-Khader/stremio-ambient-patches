@@ -104,6 +104,15 @@ public final class AmbientTest {
         eq(100, l.i("hdr.bright"), "reset all");
         eq(20 == 20 ? 8 : 0, l.i("top"), "reset all puts top back");
         eq("10.0.0.2", l.get("host"), "reset all keeps the address");
+        Settings pt = set("depth", "14", "barLevel", "20", "sdr.bright", "150", "top", "12");
+        pt.reset("points");
+        check(pt.i("depth") == 10 && pt.i("barLevel") == 2 && pt.i("top") == 8, "reset points: depth, bar level and counts back");
+        eq(150, pt.i("sdr.bright"), "reset points leaves the colours");
+        Map<String, Object> old = new HashMap<>();
+        old.put("barLevel", "88");
+        Settings ol = new Settings();
+        ol.load(old);
+        eq(2, ol.i("barLevel"), "a stored bar level of 88 (over the new 32 limit) falls back to true black");
         eq(9000, l.i("port"), "reset all keeps the port");
         // JSON
         Settings j = new Settings();
@@ -180,9 +189,11 @@ public final class AmbientTest {
 
     static void letterbox() {
         Edges.Params p = new Edges.Params();
-        // 2.39:1 film in a 16:9 frame: black bars of 7 rows at the top and the bottom, picture red at its edges
+        p.barLevel = new Settings().i("barLevel");
+        eq(2, p.barLevel, "default bar level: true black only (video black arrives as 0-1)");
+        // 2.39:1 film in a 16:9 frame: true-black bars of 7 rows at the top and the bottom, picture red at its edges
         int[] px = new int[W * H];
-        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (y < 7 || y >= H - 7 ? 0x050505 : 0xc01010);
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (y < 7 || y >= H - 7 ? 0x000000 : 0xc01010);
         Edges.Result r = Edges.sample(px, W, H, p, null);
         eq(7, r.content[1], "content top below the bar");
         eq(H - 8, r.content[3], "content bottom above the bar");
@@ -191,27 +202,57 @@ public final class AmbientTest {
         p.bars = false;
         Edges.Result nb = Edges.sample(px, W, H, p, null);
         check(nb.colours[0] != 0xc01010, "bars off: the top point reads the bar");
-        // pure blue edges are picture, not bars
         p.bars = true;
+        // near-black rows (5) are picture with the default level: only zero is a bar (an OLED's black)
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (y < 7 || y >= H - 7 ? 0x050505 : 0xc01010);
+        eq(0, Edges.sample(px, W, H, p, null).content[1], "dark grey 5 is not a bar at the default level");
+        p.barLevel = 8;
+        eq(7, Edges.sample(px, W, H, p, null).content[1], "level 8: dark grey 5 counts");
+        p.barLevel = 2;
+        // video black as the GPU hands it over (1,0,1) is a bar
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (y < 7 || y >= H - 7 ? 0x010001 : 0xc01010);
+        eq(7, Edges.sample(px, W, H, p, null).content[1], "video black 01,00,01 is a bar");
+        // a dark area on ONE side only is picture: the owner's TV cut the right and bottom of a dark scene
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (x > 70 || y > 35 ? 0 : 0x806040);
+        int[] one = Edges.sample(px, W, H, p, null).content;
+        check(one[0] == 0 && one[1] == 0 && one[2] == W - 1 && one[3] == H - 1, "black on one side only: the whole frame " + java.util.Arrays.toString(one));
+        // uneven letterbox (3 rows top, 7 bottom): the smaller pair
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (y < 3 || y >= H - 7 ? 0 : 0xc01010);
+        int[] uneven = Edges.sample(px, W, H, p, null).content;
+        check(uneven[1] == 3 && uneven[3] == H - 4, "uneven bars: both sides take the smaller " + java.util.Arrays.toString(uneven));
+        // pure blue edges are picture, not bars
         for (int i = 0; i < px.length; i++) px[i] = 0xff0000ff;
         eq(0, Edges.sample(px, W, H, p, null).content[1], "blue is not a bar");
-        // an all-dark frame keeps the previous bounds
-        for (int i = 0; i < px.length; i++) px[i] = 0xff020202;
+        // an all-black frame keeps the previous bounds
+        for (int i = 0; i < px.length; i++) px[i] = 0xff000000;
         int[] prev = {3, 7, 92, 46};
         int[] got = Edges.sample(px, W, H, p, prev).content;
-        check(java.util.Arrays.equals(prev, got), "dark frame keeps the previous content");
-        eq(0, Edges.sample(px, W, H, p, null).content[1], "dark first frame: whole frame");
+        check(java.util.Arrays.equals(prev, got), "black frame keeps the previous content");
+        eq(0, Edges.sample(px, W, H, p, null).content[1], "black first frame: whole frame");
         // pillarbox (4:3 in 16:9): 12 columns on each side
         for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) px[y * W + x] = 0xff000000 | (x < 12 || x >= W - 12 ? 0 : 0x20c020);
         Edges.Result pb = Edges.sample(px, W, H, p, null);
         eq(12, pb.content[0], "pillarbox left");
         eq(W - 13, pb.content[2], "pillarbox right");
         eq(0x20c020, pb.colours[20], "left point reads the picture");
-        // the bar level decides
-        p.barLevel = 1;
-        eq(12, Edges.sample(px, W, H, p, null).content[0], "bar level 1: pure black is still a bar");
+        p.barLevel = 0;
         for (int y = 0; y < H; y++) for (int x = 0; x < 12; x++) px[y * W + x] = 0xff010101;
-        eq(0, Edges.sample(px, W, H, p, null).content[0], "bar level 1: 1 is not below 1, so no bar");
+        eq(0, Edges.sample(px, W, H, p, null).content[0], "level 0: a pixel of 1 is not a bar");
+        p.barLevel = 2;
+        // steady over time
+        Edges.BarTracker t = new Edges.BarTracker();
+        int[] full = {0, 0, 95, 53}, box = {0, 7, 95, 46};
+        check(java.util.Arrays.equals(full, t.update(full, 0, 1500)), "first result taken at once");
+        check(java.util.Arrays.equals(full, t.update(box, 100, 1500)), "a new result waits");
+        check(java.util.Arrays.equals(full, t.update(box, 1000, 1500)), "still waiting at 0.9 s");
+        check(java.util.Arrays.equals(full, t.update(full, 1100, 1500)), "back to the old: the wait is cancelled");
+        t.update(box, 1200, 1500);
+        check(java.util.Arrays.equals(full, t.update(box, 2600, 1500)), "1.4 s after it came back: still the old");
+        check(java.util.Arrays.equals(box, t.update(box, 2700, 1500)), "held 1.5 s: taken");
+        check(java.util.Arrays.equals(box, t.update(new int[]{0, 8, 95, 45}, 2800, 1500)), "one pixel off: no change");
+        t.reset();
+        check(java.util.Arrays.equals(full, t.update(full, 2900, 1500)), "after a reset: taken at once");
+        check(java.util.Arrays.equals(box, t.update(box, 3000, 0) == null ? null : t.update(box, 3000, 0)), "no wait when bars are off");
     }
 
     static void geometryFuzz() {

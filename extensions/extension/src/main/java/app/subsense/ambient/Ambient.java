@@ -79,6 +79,7 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
     volatile long copiesOk, copiesFailed;
     private long fpsT0, fpsN;
     private int[] lastContent;
+    private final Edges.BarTracker barTracker = new Edges.BarTracker();
     private WeakReference<SurfaceView> lastSurface;
     private long probeAt;
     private volatile String lastProbe;
@@ -357,6 +358,7 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
             lastSurface = new WeakReference<>(sv);
             surfaceAt = now;
             probeMime = null;
+            work.post(barTracker::reset); // a new video starts with its own bars
             lastProbe = null;
             probeAt = 0;
         }
@@ -414,8 +416,10 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
             prio = settings.i("priority");
             rate = settings.i("rate");
         }
-        Edges.Result r = Edges.sample(px, W, H, p, lastContent);
-        lastContent = r.content;
+        // black bars: found on this frame, kept steady over time (a new result must hold 1.5 s), then sampled inside them
+        int[] found = p.bars ? Edges.content(px, W, H, p.barLevel, lastContent) : new int[]{0, 0, W - 1, H - 1};
+        lastContent = barTracker.update(found, SystemClock.elapsedRealtime(), p.bars ? 1500 : 0);
+        Edges.Result r = Edges.sampleIn(px, W, H, p, lastContent);
         // An HDR video's copy is first brought back to its light, then to the LEDs (see Hdr). Automatic: a hardware decoder's
         // buffer carries its dataspace and Android tone-maps the copy; Stremio's FFmpeg renderer writes the signal as is.
         String how = !videoHdr ? "sdr" : read.equals("auto") ? (hardwareDecoded() ? "android" : "pq") : read;

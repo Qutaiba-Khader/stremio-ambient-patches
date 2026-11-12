@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 — 2026-11-12
+
+- **Black bars: true black only.** A row or column is a bar only when no pixel in it is brighter than the bar level,
+  now 2 by default (a video's own black arrives as 0–1 after the GPU's YUV-to-RGB rounding); a dark picture is never a
+  bar. Bars come in pairs (top/bottom, left/right: the smaller side counts, so a dark area on one side stays picture),
+  and a new result must hold for 1.5 s before the areas move. The old level (24, up to 100) cut dark parts of the
+  picture off and made the box jump. A stored level over the new limit (32) falls back to the default.
+- **Resets that say what they reset:** "Reset points" on the Points card, "Reset the SDR/HDR set" on the Colour card,
+  and "Reset all settings" out of the folded section.
+
 ## 0.2.0 — 2026-11-12
 
 - **HDR light, read correctly.** On Android 14, PixelCopy tone-maps an HDR video for a 1000-nit display and scales the copy

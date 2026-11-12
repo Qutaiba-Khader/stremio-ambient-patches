@@ -220,8 +220,10 @@ html,body{overflow-x:clip}
       </div>
       <div class="group">
         <label class="sw"><span class="t">Skip black bars<small>Move the areas inside letterbox bars</small></span><input type="checkbox" class="tg" data-k="bars"></label>
-        <div class="row"><div class="rowtop"><label>Black-bar level<small>0–255</small></label><output class="val"></output></div><input type="range" data-k="barLevel"></div>
+        <div class="row"><div class="rowtop"><label>Black-bar level<small>2 = true black only</small></label><output class="val"></output></div><input type="range" data-k="barLevel"></div>
+        <p class="note">A row or column counts as a bar only if no pixel in it is brighter than this. Bars are taken in pairs (top and bottom, left and right) and only once they hold for a moment.</p>
       </div>
+      <button class="btn ghost" type="button" id="resetPoints">Reset points</button>
     </section>
 
     <!-- COLOUR -->
@@ -261,7 +263,7 @@ html,body{overflow-x:clip}
       </div>
 
       <div id="setRows"></div>
-      <button class="btn ghost" type="button" id="resetSet">Reset this set</button>
+      <button class="btn ghost" type="button" id="resetSet">Reset the SDR set</button>
     </section>
 
     <!-- SECONDARY -->
@@ -287,9 +289,10 @@ html,body{overflow-x:clip}
           <label class="fl">Page port<small>Applies the next time Stremio starts</small></label>
           <input type="number" data-k="port" inputmode="numeric" style="max-width:160px">
         </div>
-        <button class="btn danger" type="button" id="resetAll">Reset everything (keeps the address and the port)</button>
       </div>
     </details>
+
+    <button class="btn danger" type="button" id="resetAll">Reset all settings (keeps the HyperHDR address and the page port)</button>
 
     <footer id="diag"></footer>
   </div>
@@ -313,6 +316,7 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return
 function rows(){$("#setRows").innerHTML=SET_ROWS.map(function(r){return '<div class="row"><div class="rowtop"><label>'+r[1]+'</label><output class="val"></output></div><input type="range" data-k="'+tab+'.'+r[0]+'" data-fmt="'+r[2]+'"></div>'}).join("");
   $("#hdrLight").style.display=tab==="hdr"?"":"none";
   $$(".tab").forEach(function(x){x.classList.toggle("on",x.dataset.set===tab)});
+  $("#resetSet").textContent="Reset the "+tab.toUpperCase()+" set";
   if(S)fill(true);tabs();curve();}
 function send(k,v){pending[k]=v;clearTimeout(timer);timer=setTimeout(flush,120)}
 function post(path,data){return fetch(path,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Ambient":"1"},body:new URLSearchParams(data).toString()})
@@ -389,6 +393,7 @@ $$("[data-view]").forEach(function(b){b.onclick=function(){view=b.dataset.view;$
 $("#save").onclick=function(){post("/api/set",{host:$("#host").value.trim()})};
 $("#host").addEventListener("keydown",function(e){if(e.key==="Enter")$("#save").click()});
 $("#resetSet").onclick=function(){if(confirm("Reset the "+tab.toUpperCase()+" set to its defaults?"))post("/api/reset",{prefix:tab+"."})};
+$("#resetPoints").onclick=function(){if(confirm("Reset the points (counts, area, black bars) to their defaults?"))post("/api/reset",{prefix:"points"})};
 $("#resetAll").onclick=function(){if(confirm("Reset every setting except the HyperHDR address and the port?"))post("/api/reset",{prefix:""})};
 window.addEventListener("resize",function(){geoKey="";try{preview()}catch(e){}});
 function poll(){var next=function(){setTimeout(poll,P&&P.areas&&P.areas.length?300:1000)};
