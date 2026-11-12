@@ -80,13 +80,20 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
     private long fpsT0, fpsN;
     private int[] lastContent;
     private final Edges.BarTracker barTracker = new Edges.BarTracker();
+    private final Hdr.AutoWhite autoWhite = new Hdr.AutoWhite();
+    private final Application app;
+    volatile TvDisplay tv = new TvDisplay();
+    /** What the HDR light uses now: the white level and the brightest highlight (nits), and the film's level (nits). */
+    volatile double whiteNow = 203, peakNow = 1000, filmKey = Double.NaN;
     private WeakReference<SurfaceView> lastSurface;
     private long probeAt;
     private volatile String lastProbe;
 
     private Ambient(Application app) {
+        this.app = app;
         prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         settings.load(prefs.getAll());
+        migrate();
         String v = "?";
         try {
             v = app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName;
@@ -103,6 +110,24 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
     }
 
     static Ambient get() { return instance; }
+
+    /**
+     * Stored settings from older versions: a value that was only ever the old default follows the new default.
+     * 3: updates per second 20 -> 11, points per edge 8/8/4/4 -> 6/6/3/3 (the owner's choices).
+     */
+    private void migrate() {
+        int v = prefs.getInt("settingsVersion", 0);
+        if (v >= 3) return;
+        SharedPreferences.Editor e = prefs.edit();
+        String[][] moved = {{"rate", "20", "11"}, {"top", "8", "6"}, {"bottom", "8", "6"}, {"left", "4", "3"}, {"right", "4", "3"}};
+        for (String[] m : moved) {
+            if (m[1].equals(prefs.getString(m[0], null))) {
+                settings.set(m[0], m[2]);
+                e.putString(m[0], m[2]);
+            }
+        }
+        e.putInt("settingsVersion", 3).commit();
+    }
 
     // ---- entry points ----
 
@@ -247,6 +272,13 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
 
     long sent() { return sender.sent; }
 
+    /** The TV as Android sees it, read again when older than 30 s (for the page). */
+    TvDisplay tv() {
+        TvDisplay t = tv;
+        if (t.readAt == 0 || SystemClock.elapsedRealtime() - t.readAt > 30_000) tv = t = TvDisplay.read(app);
+        return t;
+    }
+
     // ---- activities ----
 
     @Override public void onActivityResumed(Activity a) {
@@ -359,6 +391,7 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
             surfaceAt = now;
             probeMime = null;
             work.post(barTracker::reset); // a new video starts with its own bars
+            work.post(autoWhite::reset);  // and its own brightness
             lastProbe = null;
             probeAt = 0;
         }
@@ -404,7 +437,8 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
         Edges.Colour colour;
         Hdr.Curve curve;
         String set, host, read;
-        int prio, rate;
+        int prio, rate, lift;
+        boolean autoOn, peakTv;
         synchronized (settings) {
             p = Edges.Params.of(settings);
             String mode = settings.get("hdrMode");
@@ -412,26 +446,43 @@ public final class Ambient implements Application.ActivityLifecycleCallbacks, Ru
             colour = Edges.Colour.of(settings, set);
             curve = Hdr.Curve.of(settings);
             read = settings.get("hdr.read");
+            autoOn = settings.b("hdr.autoWhite");
+            peakTv = settings.b("hdr.peakTv");
+            lift = settings.i("hdr.lift");
             host = settings.get("host");
             prio = settings.i("priority");
             rate = settings.i("rate");
         }
         // black bars: found on this frame, kept steady over time (a new result must hold 1.5 s), then sampled inside them
+        long now = SystemClock.elapsedRealtime();
         int[] found = p.bars ? Edges.content(px, W, H, p.barLevel, lastContent) : new int[]{0, 0, W - 1, H - 1};
-        lastContent = barTracker.update(found, SystemClock.elapsedRealtime(), p.bars ? 1500 : 0);
+        lastContent = barTracker.update(found, now, p.bars ? 1500 : 0);
         Edges.Result r = Edges.sampleIn(px, W, H, p, lastContent);
         // An HDR video's copy is first brought back to its light, then to the LEDs (see Hdr). Automatic: a hardware decoder's
         // buffer carries its dataspace and Android tone-maps the copy; Stremio's FFmpeg renderer writes the signal as is.
         String how = !videoHdr ? "sdr" : read.equals("auto") ? (hardwareDecoded() ? "android" : "pq") : read;
         hdrReading = how;
         int[] out = new int[r.colours.length];
-        for (int i = 0; i < out.length; i++) out[i] = colour.apply(Hdr.toLed(r.colours[i], how, videoHlg, curve));
+        double[][] nits = new double[r.colours.length][];
+        for (int i = 0; i < out.length; i++) nits[i] = Hdr.toNits(r.colours[i], how, videoHlg);
+        if (nits.length > 0 && nits[0] != null) {
+            // the TV's own peak (EDID) when asked for, and the white level following the film when automatic
+            TvDisplay t = tv;
+            if (t.readAt == 0 || now - t.readAt > 30_000) tv = t = TvDisplay.read(app);
+            double peak = t.peak(peakTv, curve.peak);
+            double key = autoWhite.update(nits, now);
+            double white = autoOn ? Hdr.AutoWhite.white(key, lift, peak) : curve.white;
+            curve = curve.withPeak(peak).withWhite(white);
+            whiteNow = curve.white;
+            peakNow = curve.peak;
+            filmKey = key;
+        }
+        for (int i = 0; i < out.length; i++) out[i] = colour.apply(nits[i] == null ? r.colours[i] & 0xffffff : curve.encode(nits[i]));
         activeSet = set;
         rawColours = r.colours;
         outColours = out;
         areas = r.areas;
         content = r.content;
-        long now = SystemClock.elapsedRealtime();
         if (fpsT0 == 0) fpsT0 = now;
         fpsN++;
         if (now - fpsT0 >= 2000) {

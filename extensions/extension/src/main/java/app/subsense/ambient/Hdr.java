@@ -132,6 +132,10 @@ final class Hdr {
             return new Curve(s.i("hdr.white"), s.i("hdr.peak"), s.i("hdr.headroom") / 100.0);
         }
 
+        Curve withWhite(double w) { return new Curve(w, peak, headroom); }
+
+        Curve withPeak(double p) { return new Curve(white, p, headroom); }
+
         /** LED light (0..1, linear) for this many nits. */
         double led(double nits) {
             if (nits <= 0) return 0;
@@ -160,10 +164,66 @@ final class Hdr {
 
     /** How the copy of an HDR video is read: "android" (tone-mapped by Android), "pq" (the signal itself: PQ or HLG), "sdr" (as is). */
     static int toLed(int rgb, String how, boolean hlg, Curve curve) {
+        double[] n = toNits(rgb, how, hlg);
+        return n == null ? rgb & 0xffffff : curve.encode(n);
+    }
+
+    /** The copy's colour as nits per channel, or null when it is read as is ("sdr"). */
+    static double[] toNits(int rgb, String how, boolean hlg) {
         switch (how) {
-            case "android": return curve.encode(androidToNits(rgb, hlg));
-            case "pq": return curve.encode(hlg ? hlgToNits(rgb) : pqToNits(rgb));
-            default: return rgb & 0xffffff;
+            case "android": return androidToNits(rgb, hlg);
+            case "pq": return hlg ? hlgToNits(rgb) : pqToNits(rgb);
+            default: return null;
+        }
+    }
+
+    static double luminance(double[] n) {
+        return 0.2126 * n[0] + 0.7152 * n[1] + 0.0722 * n[2];
+    }
+
+    /**
+     * Automatic white level: films are graded far below HDR's 203-nit reference white (edges mostly 5-100 nits), and
+     * how dark differs from film to film, so the white level follows the film like a camera's exposure. Each frame gives
+     * a key (the 80th percentile of the points' luminance, in nits); the key moves slowly (log scale, about 20 s, faster
+     * in the first seconds), dark frames (key under 1 nit: fades, credits) don't move it, and white = key x 0.4 x
+     * 100 / lift, within 5 nits and the brightest highlight. 0.4 puts the owner's film (key about 50) at the white he chose by
+     * hand (20). Pure: the time is given.
+     */
+    static final class AutoWhite {
+        static final double K = 0.4, TAU_MS = 20_000, FAST_MS = 2_000, FAST_FOR_MS = 6_000, MIN = 5;
+        private double logKey = Double.NaN;
+        private long started = -1, last = -1;
+
+        void reset() {
+            logKey = Double.NaN;
+            started = last = -1;
+        }
+
+        /** Takes one frame (each point's nits); returns the key in nits (NaN until a frame with light came). */
+        double update(double[][] points, long now) {
+            double[] lum = new double[points.length];
+            for (int i = 0; i < points.length; i++) lum[i] = luminance(points[i]);
+            java.util.Arrays.sort(lum);
+            double key = lum.length == 0 ? 0 : lum[Math.min(lum.length - 1, (int) Math.floor(lum.length * 0.8))];
+            if (started < 0) started = now;
+            long dt = last < 0 ? 0 : Math.max(0, now - last);
+            last = now;
+            if (key < 1) return key();
+            double target = Math.log(key);
+            if (Double.isNaN(logKey)) logKey = target;
+            else {
+                double tau = now - started < FAST_FOR_MS ? FAST_MS : TAU_MS;
+                logKey += (target - logKey) * Math.min(1, dt / tau);
+            }
+            return key();
+        }
+
+        double key() { return Double.isNaN(logKey) ? Double.NaN : Math.exp(logKey); }
+
+        /** The white level for this key and lift (%, 100 = as calibrated; more = brighter lights). */
+        static double white(double key, int lift, double peak) {
+            if (Double.isNaN(key)) return 203;
+            return Math.max(MIN, Math.min(peak, key * K * 100.0 / Math.max(1, lift)));
         }
     }
 }

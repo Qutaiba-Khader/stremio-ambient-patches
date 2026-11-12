@@ -37,6 +37,7 @@ public final class AmbientTest {
         net();
         formats();
         hdr();
+        autoWhite();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
     }
@@ -48,8 +49,8 @@ public final class AmbientTest {
         eq("", s.get("host"), "no HyperHDR address by default");
         check(s.b("enabled"), "on by default");
         check(!s.b("tunnel"), "tunneled playback off by default");
-        eq(8, s.i("top"), "top default");
-        eq(4, s.i("left"), "left default");
+        eq(6, s.i("top"), "top default");
+        eq(3, s.i("left"), "left default");
         eq(8095, s.i("port"), "page port default");
         eq(null, s.set("top", "12"), "top 12 accepted");
         eq(12, s.i("top"), "top stored");
@@ -88,7 +89,7 @@ public final class AmbientTest {
         Settings l = new Settings();
         l.load(stored);
         eq(20, l.i("top"), "stored top loaded");
-        eq(4, l.i("left"), "bad stored left keeps the default");
+        eq(3, l.i("left"), "bad stored left keeps the default");
         eq("", l.get("host"), "bad stored address keeps none");
         eq(150, l.i("hdr.white"), "stored hdr.white");
         check(l.get("hdr.fix") == null, "an old setting is not kept");
@@ -102,11 +103,11 @@ public final class AmbientTest {
         eq(150, l.i("hdr.bright"), "reset sdr. leaves hdr.");
         l.reset("");
         eq(100, l.i("hdr.bright"), "reset all");
-        eq(20 == 20 ? 8 : 0, l.i("top"), "reset all puts top back");
+        eq(6, l.i("top"), "reset all puts top back");
         eq("10.0.0.2", l.get("host"), "reset all keeps the address");
         Settings pt = set("depth", "14", "barLevel", "20", "sdr.bright", "150", "top", "12");
         pt.reset("points");
-        check(pt.i("depth") == 10 && pt.i("barLevel") == 2 && pt.i("top") == 8, "reset points: depth, bar level and counts back");
+        check(pt.i("depth") == 10 && pt.i("barLevel") == 2 && pt.i("top") == 6, "reset points: depth, bar level and counts back");
         eq(150, pt.i("sdr.bright"), "reset points leaves the colours");
         Map<String, Object> old = new HashMap<>();
         old.put("barLevel", "88");
@@ -120,7 +121,7 @@ public final class AmbientTest {
         String js = j.toJson();
         check(js.startsWith("{\"enabled\":true,\"host\":\"1.2.3.4\""), "toJson start: " + js.substring(0, 40));
         check(js.contains("\"sdr.temp\":0"), "toJson numbers");
-        check(Settings.defsJson().contains("\"top\":{\"min\":1,\"max\":64,\"def\":8}"), "defsJson ranges");
+        check(Settings.defsJson().contains("\"top\":{\"min\":1,\"max\":64,\"def\":6}"), "defsJson ranges");
         check(Settings.defsJson().contains("\"host\":{\"min\":0,\"max\":0,\"def\":\"\"}"), "defsJson host");
         eq("\"a\\\"b\\u003c\"", Json.str("a\"b<"), "JSON escaping");
         for (Settings.Def d : Settings.DEFS) eq(null, new Settings().set(d.key, d.def), "default valid: " + d.key);
@@ -594,6 +595,55 @@ public final class AmbientTest {
         Settings r = set("hdr.white", "100", "hdr.peak", "2000");
         r.reset("hdr.");
         eq(203, r.i("hdr.white"), "reset HDR set puts the white back");
+    }
+
+    static double[][] grey(int n, double nits) {
+        double[][] p = new double[n][];
+        for (int i = 0; i < n; i++) p[i] = new double[]{nits, nits, nits};
+        return p;
+    }
+
+    static void autoWhite() {
+        Hdr.AutoWhite a = new Hdr.AutoWhite();
+        check(Double.isNaN(a.key()), "no key before a frame");
+        eq(203.0, Hdr.AutoWhite.white(Double.NaN, 100, 1000), "no key yet: reference white");
+        a.update(grey(24, 50), 0);
+        check(Math.abs(a.key() - 50) < 1e-6, "first frame sets the key");
+        eq(20L, Math.round(Hdr.AutoWhite.white(a.key(), 100, 1000)), "the owner's film (key 50): white 20, what he chose by hand");
+        eq(10L, Math.round(Hdr.AutoWhite.white(50, 200, 1000)), "lift 200 %: half the white, brighter lights");
+        eq(5L, Math.round(Hdr.AutoWhite.white(1, 100, 1000)), "never under 5 nits");
+        eq(800L, Math.round(Hdr.AutoWhite.white(100000, 100, 800)), "never over the peak");
+        // 80th percentile: a few bright points don't drive it
+        double[][] mixed = grey(24, 10);
+        for (int i = 0; i < 3; i++) mixed[i] = new double[]{900, 900, 900};
+        Hdr.AutoWhite b = new Hdr.AutoWhite();
+        b.update(mixed, 0);
+        check(Math.abs(b.key() - 10) < 1e-6, "3 bright points of 24 do not move the key: " + b.key());
+        // slow after the first seconds: a jump to 500 nits moves the key only part of the way in 1 s
+        for (long t = 100; t <= 7000; t += 100) a.update(grey(24, 50), t);
+        a.update(grey(24, 500), 8000);
+        a.update(grey(24, 500), 9000);
+        check(a.key() > 50 && a.key() < 100, "a sudden bright scene moves the key slowly: " + Math.round(a.key()));
+        for (long t = 9100; t <= 90000; t += 100) a.update(grey(24, 500), t);
+        check(Math.abs(a.key() - 500) < 25, "a long bright film: the key gets there: " + Math.round(a.key()));
+        // dark frames (fades) don't move it
+        double before = a.key();
+        for (long t = 90100; t <= 120000; t += 100) a.update(grey(24, 0.3), t);
+        check(Math.abs(a.key() - before) < 1e-9, "a long fade to black leaves the key alone");
+        a.reset();
+        check(Double.isNaN(a.key()), "reset: a new film starts fresh");
+        // fast at the start: within the first seconds the key follows quickly
+        Hdr.AutoWhite c = new Hdr.AutoWhite();
+        c.update(grey(24, 20), 0);
+        for (long t = 100; t <= 4000; t += 100) c.update(grey(24, 200), t);
+        check(c.key() > 120, "first seconds: quick to settle (2 s steps): " + Math.round(c.key()));
+        Settings d = new Settings();
+        check(d.b("hdr.autoWhite") && d.b("hdr.peakTv") && d.i("hdr.lift") == 100, "first run: automatic white and the TV's peak");
+        Settings m = set("hdr.autoWhite", "0", "hdr.peakTv", "0", "hdr.lift", "150");
+        m.reset("hdr.");
+        check(m.b("hdr.autoWhite") && m.b("hdr.peakTv") && m.i("hdr.lift") == 100, "reset: back to automatic");
+        Hdr.Curve k = new Hdr.Curve(203, 1000, 0.25).withWhite(20).withPeak(800);
+        check(k.white == 20 && k.peak == 800 && k.headroom == 0.25, "curve with the live white and peak");
     }
 }
 

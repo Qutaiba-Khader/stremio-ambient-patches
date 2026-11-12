@@ -181,6 +181,11 @@ final class WebServer extends Thread {
         sb.append(",\"videoHdr\":").append(a.videoHdr);
         sb.append(",\"videoTunneled\":").append(a.videoTunneled);
         sb.append(",\"videoAt\":").append(a.videoAt);
+        sb.append(",\"tvDisplay\":");
+        a.tv().json(sb);
+        sb.append(",\"whiteNow\":").append(Math.round(a.whiteNow));
+        sb.append(",\"peakNow\":").append(Math.round(a.peakNow));
+        sb.append(",\"filmKey\":").append(Double.isNaN(a.filmKey) ? "null" : String.valueOf(Math.round(a.filmKey)));
         sb.append(",\"hdrReading\":");
         Json.str(sb, a.hdrReading);
         sb.append(",\"activeSet\":");

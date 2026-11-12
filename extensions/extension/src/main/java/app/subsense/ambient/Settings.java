@@ -39,8 +39,8 @@ final class Settings {
             // The owner types it on the TV's page; never a default address (see the plan: no address in the code).
             new Def("host", HOST, "", 0, 0),
             i("priority", 90, 50, 250),         // HyperHDR: the lower number wins; it takes 50-250 from a flatbuffer client
-            i("rate", 20, 1, 50),               // updates per second
-            i("top", 8, 1, 64), i("bottom", 8, 1, 64), i("left", 4, 1, 64), i("right", 4, 1, 64),
+            i("rate", 11, 1, 50),               // updates per second (11: the owner's best, 2026-11-12)
+            i("top", 6, 1, 64), i("bottom", 6, 1, 64), i("left", 3, 1, 64), i("right", 3, 1, 64), // the owner's choice
             i("inset", 0, 0, 30),               // distance from the picture's edge, % of the picture's height
             i("depth", 10, 1, 50),              // how far each area reaches into the picture, % of the height
             i("spread", 100, 10, 100),          // how much of its share of the edge each area covers, %
@@ -57,9 +57,12 @@ final class Settings {
             i("hdr.sat", 100, 0, 300), i("hdr.temp", 0, -100, 100),
             // HDR light (see Hdr): how the copy is read, the white level, the highlights' share of the LEDs, the top
             new Def("hdr.read", CHOICE, "auto", 0, 0, "auto", "android", "pq", "sdr"),
-            i("hdr.white", 203, 20, 1000),      // nits that count as white (BT.2408 HDR reference white: 203)
+            b("hdr.autoWhite", true),           // the white level follows the film (Hdr.AutoWhite)
+            i("hdr.lift", 100, 25, 400),        // automatic white: more = brighter lights
+            i("hdr.white", 203, 5, 1000),       // manual white level, nits (BT.2408 HDR reference white: 203)
             i("hdr.headroom", 25, 0, 90),       // % of the LED range kept for light above white
-            i("hdr.peak", 1000, 100, 4000),     // nits of the brightest highlight (about the TV's peak)
+            b("hdr.peakTv", true),              // the brightest highlight = the TV's own peak (EDID, via Android)
+            i("hdr.peak", 1000, 100, 4000),     // manual brightest highlight, nits
     };
 
     private final Map<String, String> values = new LinkedHashMap<>();

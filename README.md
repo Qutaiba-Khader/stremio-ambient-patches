@@ -29,6 +29,9 @@ video leaves, the light is turned off or the address is removed). HyperHDR's LED
   nits back — or, for a video decoded by Stremio's FFmpeg renderer (no dataspace on the window), decodes the PQ/HLG signal
   itself — and maps the light to the LEDs with the HDR set's **white level** (nits shown as full white), **highlight
   headroom** (LED range kept above white for highlights) and **brightest highlight** (nits, about the TV's peak).
+- **Automatic HDR light**: the white level follows the film (its edge light's 80th percentile, smoothed over about
+  20 s, dark frames ignored), and the brightest highlight comes from the TV's EDID (`Display.HdrCapabilities`) when
+  the TV reports it. Both are the defaults; either can be set by hand.
 - **Tunneled playback**: Stremio turns it on with "Audio passthrough", and a tunneled picture never reaches the app. The
   patch gives it its own switch on the page, **off by default**; audio passthrough keeps working without it.
 - **Nothing is built in**: there is no HyperHDR address in the code and no discovery. Until one is typed on the page

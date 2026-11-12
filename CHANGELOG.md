@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-11-12
+
+- **HDR light tunes itself.** Real films are graded far below HDR's 203-nit reference white (edge light measured on
+  the owner's TV: mostly 20–60 nits), so a fixed white level can't fit them all. **Automatic white level** (on by
+  default): it follows the film's brightness like a camera's exposure — the 80th percentile of the points' light,
+  smoothed over about 20 s, dark frames ignored — with a **Lights level** to make it brighter or dimmer. Calibrated so
+  the owner's film lands where he set it by hand.
+- **Brightest highlight from the TV** (on by default): the peak luminance the TV reports in its EDID (Android's
+  Display.HdrCapabilities). A TV that reports none keeps the manual value. The page shows the TV's name, maker, year,
+  HDR types and luminance as Android sees them.
+- First run and every reset start in this automatic setup.
+- **▲▼ arrows** on every slider value: one step per tap, repeating while held.
+- New defaults: 11 updates per second; 6 / 6 / 3 / 3 points per edge. Settings that were still at the old defaults
+  (20; 8 / 8 / 4 / 4) move to the new ones once.
+
 ## 0.2.1 — 2026-11-12
 
 - **Black bars: true black only.** A row or column is a bar only when no pixel in it is brighter than the bar level,
