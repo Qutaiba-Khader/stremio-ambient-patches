@@ -1,0 +1,17 @@
+{
+  "bundle_name": "Stremio Ambient Patches",
+  "apps": [
+    {
+      "name": "Stremio TV Ambient",
+      "feed": "android_tv",
+      "arch": "armeabi-v7a",
+      "sources": [
+        {"bundle": "self", "include": ["Ambient light", "Ambient app name and icon"]},
+        {"bundle": "github:Qutaiba-Khader/stremio-subs-patches", "include": ["Subtitle auto-refresh", "Right-to-left subtitle lines"]},
+        {"bundle": "github:MorpheApp/morphe-patches", "include": ["Clone app"]}
+      ],
+      "args": ["-OpackageName=com.stremio.one.ambient"],
+      "after": ["Disable Play Store updates"]
+    }
+  ]
+}

@@ -75,6 +75,16 @@ java -jar morphe-desktop-<ver>-all.jar patch \
 
 A tag `vX.Y.Z` publishes `patches-X.Y.Z.mpp` as a GitHub release.
 
+## Newest Morphe Patcher, automatically
+
+Every day `.github/workflows/patcher-update.yml` asks whether the last release is built on the newest Morphe versions:
+the Morphe Patcher the newest Morphe CLI (morphe-desktop) is built with, its smali, and the newest Morphe Gradle plugin
+(`tools/morphe_versions.py`). If not, it builds the patches on them, patches the current Stremio apps from Stremio's own
+feed exactly as morphe-builder does (`tools/stremio_check.py`, apps listed in `tools/stremio-check.json`), and publishes
+the next patch version only when every patch applied and the CLI gave no warning about an older Morphe Patcher.
+morphe-builder then builds the apps from that release. If anything fails, nothing is published and the last release
+stays in use. "Run workflow" on another branch tests that branch with Stremio without publishing.
+
 ## License
 
 GPLv3 — see `LICENSE` and `NOTICE`.
